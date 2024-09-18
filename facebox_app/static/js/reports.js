@@ -158,7 +158,7 @@ function showFolders(parent_id = 1) {
 
     function fetchFolders(parent_id = 1) {
         const csrftoken = getCookie('csrftoken');
-        return fetch(`/api/get-folder/${parent_id}/`, {
+        return fetch(`/api/get-folders/${parent_id}/`, {
             method: 'GET',
             headers: {
                 'Subscription-ID': SUBSCRIPTION_ID,
@@ -173,12 +173,16 @@ function showFolders(parent_id = 1) {
 
     function createFolderElement(tree,folder) {
         const row = document.createElement('tr');
-        const col = document.createElement('td');
+        const col1 = document.createElement('td');
+        const col2 = document.createElement('td');
         const icon = document.createElement('span');
         const label = document.createElement('span');
-        row.appendChild(col);
-        col.appendChild(icon);
-        col.appendChild(label);
+        row.id = 'row_' + folder.folder_id;
+        row.appendChild(col1);
+        row.appendChild(col2);
+        col1.innerHTML = folder.folder_id;
+        col2.appendChild(icon);
+        col2.appendChild(label);
         icon.innerHTML = FOLDER_ICON;
         icon.style.paddingLeft = (folder.folder_level * FOLDER_WIDTH) + 'px';
         icon.setAttribute('folder_id',folder.folder_id);
@@ -214,8 +218,8 @@ function showFolders(parent_id = 1) {
     function createHeaders(table) {
         const row = document.createElement('tr');
         table.appendChild(row);
-        const headers = ['Folder Name','Stats As Of','Updated','Subfolders','Files','Videos',
-            'Photos','Audios','For Review','Reviewed',''];
+        const headers = ['ID','Folder Name','Stats As Of','Updated','Subfolders','Files','Videos',
+            'Audios','Photos','For Review','Reviewed',''];
         headers.forEach(header => {
             const hd = document.createElement('th');
             hd.innerHTML = header;
@@ -238,6 +242,11 @@ function showFolders(parent_id = 1) {
         row.appendChild(col);
         let button = document.createElement('button');
         button.innerHTML = '\u27F3';
+        button.addEventListener('click', function() {
+            if (confirm('This operation can potentially slowdown the server when the number of files in the folder is tens of thousands or more. Continue?')) {
+                refreshFolderStats(folder.folder_id);
+            }
+        });
         col.appendChild(button);
     }
 
@@ -245,12 +254,16 @@ function showFolders(parent_id = 1) {
         const table = document.createElement('table');
         createHeaders(table);
         const row = document.createElement('tr');
-        const col = document.createElement('td');
+        const col1 = document.createElement('td');
+        const col2 = document.createElement('td');
         const icon = document.createElement('span');
         const label = document.createElement('span');
-        row.appendChild(col);
-        col.appendChild(icon);
-        col.appendChild(label);
+        row.id = 'row_' + folder.folder_id;
+        row.appendChild(col1);
+        row.appendChild(col2);
+        col1.innerHTML = folder.folder_id;
+        col2.appendChild(icon);
+        col2.appendChild(label);
         table.appendChild(row);
         table.id = 'folder-tree';
         table.classList.add('results-table');
@@ -309,4 +322,64 @@ function setMaxRows(value) {
             li.style.listStyleType = 'none';
         }
     });
+}
+
+function refreshFolderStats(folder_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/refresh-folder-stats/${folder_id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Folder-ID': folder_id,
+            'Max-Rows': maxRows,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.rowcount > 0) {
+            fetch(`/api/get-folder/${folder_id}/`, {
+                method: 'GET',
+                headers: {
+                    'Subscription-ID': SUBSCRIPTION_ID,
+                    'Client-Secret': CLIENT_SECRET,
+                    'Folder-ID': folder_id,
+                    'Max-Rows': maxRows,
+                    'X-CSRFToken': csrftoken,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.log(data.error);
+                } else {
+                    replaceRow(data.results[0]);
+                }
+            })
+            .catch(error => {
+                alert('Unable to retrieve updated data:', error);
+            });
+        } else {
+            alert('No such folder to refresh.');
+        }
+    })
+    .catch(error => {
+        alert('Unable to refresh folder stats:', error);
+    });
+}
+
+function replaceRow(folder) {
+    const curRow = document.getElementById('row_' + folder.folder_id); 
+    const cols = curRow.querySelectorAll('td');
+    cols[0].innerHTML = folder.folder_id;
+    cols[2].innerHTML = formatGMTToLocal(folder.stats_as_of);
+    cols[3].innerHTML = timeElapsed(folder.stats_as_of);
+    cols[4].innerHTML = folder.subfolder_count;
+    cols[5].innerHTML = folder.file_count;
+    cols[6].innerHTML = folder.video_count;
+    cols[7].innerHTML = folder.audio_count;
+    cols[8].innerHTML = folder.photo_count;
+    cols[9].innerHTML = folder.reviewed_count;
+    cols[10].innerHTML = folder.file_count - folder.reviewed_count;
 }

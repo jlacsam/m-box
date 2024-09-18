@@ -511,7 +511,7 @@ function browseFolder(parent_id = 1) {
 
     function fetchFolders(parent_id = 1) {
         const csrftoken = getCookie('csrftoken');
-        return fetch(`/api/get-folder/${parent_id}/`, {
+        return fetch(`/api/get-folders/${parent_id}/`, {
             method: 'GET',
             headers: {
                 'Subscription-ID': SUBSCRIPTION_ID,

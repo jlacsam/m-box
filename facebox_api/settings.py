@@ -189,6 +189,7 @@ AUTH_ADFS = {
 
 AZURE_CONNECTION_STRING = os.environ.get('AZURE_CONNECTION_STRING') # 'DefaultEndpointsProtocol=https;AccountName=ayalamedialib;AccountKey=XFv/79FwVeooejIfcHWZ/eI6U3DKtcKZ2ZDb8zwnkcSZgFBJnIz3K0LJvdCKYOGETaZHJ1BZ8zwN+ASt9PPZuQ==;EndpointSuffix=core.windows.net'
 MBOX_EDITORS_GROUP = os.environ.get('MBOX_EDITORS_GROUP')  #'20a6b3e3-fe60-4c00-a09d-2061dab62dd9'
+MBOX_SUPERVISORS_GROUP = os.environ.get('MBOX_SUPERVISORS_GROUP')
 REST_USE_JWT = True
 
 LOGIN_URL = '/login/'

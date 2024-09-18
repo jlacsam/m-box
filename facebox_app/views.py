@@ -552,7 +552,7 @@ def get_adjacent_media(request, file_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Get folders from the fbx_folder table ############################################################
+# Get a folder from the fbx_folder table ###########################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -578,15 +578,58 @@ def get_folder(request, folder_id):
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
             parent_id, remarks, schema_id, extra_data
         FROM fbx_folder
+        WHERE folder_id = %s
     """
-    if folder_id > 0:
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, (folder_id,))
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Serialize the results and return the response
+    if len(rows):
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
+# Get folders from the fbx_folder table ############################################################
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_folders(request, parent_id):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+   
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Search for matching records in the database
+    labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
+        'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
+        'owner_rights', 'group_rights', 'public_rights', 'subfolder_count', 'file_count', 
+        'video_count', 'audio_count', 'photo_count', 'reviewed_count', 'page_count', 'stats_as_of',
+        'parent_id', 'remarks', 'schema_id', 'extra_data'];
+    rows = []
+    query = """
+        SELECT folder_id, name, path, size, date_created, folder_level, description,
+            last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
+            owner_rights, group_rights, public_rights, subfolder_count, file_count, 
+            video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
+            parent_id, remarks, schema_id, extra_data
+        FROM fbx_folder
+    """
+    if parent_id > 0:
         query += "WHERE NOT is_deleted AND parent_id = %s"
     else:
         query += "WHERE NOT is_deleted AND parent_id IS NULL"
 
     with connection.cursor() as cursor:
-        if folder_id > 0:
-            cursor.execute(query, (folder_id,))
+        if parent_id > 0:
+            cursor.execute(query, (parent_id,))
         else:
             cursor.execute(query, )
         rows = cursor.fetchall()
@@ -798,6 +841,28 @@ def update_transcript_segment(request, file_id):
 
     # Return the number of rows affected
     return JsonResponse({'rowcount':count}, status=status.HTTP_200_OK)
+
+
+# Refresh folder statistics ########################################################################
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def refresh_folder_stats(request, folder_id):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Check if user is a member of the SUPERVISORS group
+    groups = request.user.groups.all()
+    if not groups.filter(name=settings.MBOX_SUPERVISORS_GROUP).exists():
+        return Response({'error': 'User is not allowed to perform folder stats update.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    with connection.cursor() as cursor:
+        cursor.execute('CALL refresh_folder_stats(%s, 0)', [folder_id])
+        rowcount = cursor.fetchone()[0]
+        return Response({'rowcount':rowcount}, status=status.HTTP_200_OK)
 
 
 # Search the fbx_person table ######################################################################
@@ -1014,7 +1079,7 @@ def app_logout(request):
             logout(request)
     else:
         redirect('/oauth2/logout')
-    return redirect('login/')
+    return redirect('/login/')
 
 @login_required
 def video_search(request):
