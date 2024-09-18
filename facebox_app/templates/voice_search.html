@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceBox</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/voicebox.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+</head>
+<body>
+    <div id="header" class="header">
+        <span class="logo">m.box</span>
+        <span class="title-bar"><table id="title-bar"><tr>
+            <td><table id="menu-bar"><tr>
+                <td id="videos-tab" onclick="goToVideos()">Videos</td>
+                <td id="photos-tab" onclick="goToPhotos()">Photos</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
+                <td id="faces-tab" onclick="goToFaces()">Faces</td>
+                <td id="voices-tab">Voices</td>
+                <td id="menu-separator">&nbsp;</td>
+                <td id="reports-tab" onclick="goToReports()">Reports</td>
+                </tr></table></td>
+            <td id="filler-space"></td>
+            <td><table id="tool-bar"><tr>
+                <td id="username">Hi {{ user.username }}!</td>
+                <td id="profile">&#x1F466</td>
+                <td id="settings">&#x2699</td></tr></table></td>
+            </tr>
+            </table>
+        </span>
+    </div>
+    <div id="popup-menu" class="popup-hidden">
+        <div id="editor-status">Editing allowed</div>
+        <div><hr></div>
+        <div class="menu-item"><a href="{% url 'django_auth_adfs:logout' %}">Sign out</a></div>
+    </div>
+    <div id="settings-menu" class="popup-hidden">
+        <div id="menu-audit" class=menu-item onclick="toggleAudit()">Show audit</div>
+        <hr>
+        <ul id="max-rows-options">
+            <li id="li-10" onclick="setMaxRows(10)">Max rows: 10</li> 
+            <li id="li-25" onclick="setMaxRows(25)">Max rows: 25</li> 
+            <li id="li-50" onclick="setMaxRows(50)">Max rows: 50</li> 
+            <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
+        </ul>
+    </div>
+    <div id="segment-menu" class="popup-hidden">
+    </div>
+    <table id="main-body"><tr>
+    <td id="main-view">
+    <div class="container">
+        <div class="dropdown">
+            <input id="search-box" type="search" name="search" class="search" placeholder="[Search all videos and audios]">
+        </div>
+        <div id="media-container">
+            <video id="video-player" style="display:none" controls></video>
+            <audio id="audio-player" controls></audio>
+        </div>
+        <div id="floating-players" style="display:none">
+            <video id="floating-video" controls></video>
+            <audio id="floating-audio" controls></audio>
+        </div>
+        <div id="speaker-container">
+            <span id="speaker-name"></span>
+            <span id="speaker-edit" onclick="showEditor()"></span>
+        </div>
+        <div id="captions-container"></div>
+        <div id="diary-container"></div>
+        <div class="slider" id="slider">
+            <table><tr>
+                <td id="results-label" style="width:40%; padding-left: 10px;">&nbsp;</td>
+                <td style="display: block; justify-content: center; align:center;"><div id="slider-input-label"><input type="range" id="similarity-slider" min="0" max="0.99" step="0.01" value="0.50">
+                <label class="similarity" for="similarity-slider">Similarity threshold: <span id="similarity-value">0.50</span></label></div></td>
+                <td style="width:40%;">&nbsp;</td>
+            </tr></table>
+        </div>
+    </div>
+    <div id="results"></div>
+    <div id="more" class="more"></div>
+    </td>
+    <td id="audit-log" class="audit-hidden">Audit log will go here.</td>
+    </tr></table>
+    <div id="search-filter" class="filter-hidden">
+        <div id="close-search-filter">&#x2BBE</div>
+        <div id="video-list">
+            <table><tr>
+                <td>Search Filter<br><br>Add more content</td>
+            </tr></table>
+        </div>
+    </div>
+    <div id="editor-div" class="editor-hidden">
+        <div>
+            <input id="first_name" name="first_name" type="text" placeholder="First name" class="name-input">
+            <input id="middle_name" name="middle_name" type="text" placeholder="Middle name" class="name-input">
+            <input id="last_name" name="last_name" type="text" placeholder="Last name" class="name-input">
+        </div>
+        <div id="editor-buttons">
+            <button id="editor-ok" class="editor-button" onclick="saveEdits()">&#x2713</button>
+            <button id="editor-cancel" class="editor-button" onclick="cancelEdits()">&#x10102</button>
+        </div>
+    </div>
+
+    <script>
+        const q_file_id = '{{ file_id }}'; 
+        const q_file_name = '{{ file_name }}';
+        const q_allow_edit = '{{ allow_edit }}';
+    </script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/voice_search.js' %}"></script>
+</body>
+</html>
+

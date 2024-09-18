@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+.svn
+.hg
+
+# Development environments
+.vscode
+.idea
+*.swp
+*.swo
+
+# Dependency directories
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build output
+dist
+build
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment files
+.env
+.env.*
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+
+# Test files
+test
+tests
+__tests__
+*.test.js
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+
+# Other common ignore patterns
+*.bak
+*.tar.gz
+*.zip

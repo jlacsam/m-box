@@ -1,0 +1,47 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M.Box</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/login.js' %}"></script>
+</head>
+<body>
+    <h1>m.box</h1>
+    <h2>What's inside?</h2>
+    <div id="container">
+        <div id="left-filler"></div>
+        <div id="billboard"><img src="{% static 'images/mbox.webp' %}" alt="media box - video, photo, audio, faces and voices"></div>
+        <div id="login">
+            <table id="signin-table">
+                <tr><td id="logo">m.box</td></tr>
+                <tr><td id="catch-phrase">What's inside?</td></tr>
+                <tr><td>
+                {% block content %}
+                    <a href="{% url 'django_auth_adfs:login' %}">Sign in with Microsoft</a>
+                {% endblock %}
+                </td></tr>
+                <tr><td>Sign in to m.box</td></tr>
+                <tr><td>
+                    {% csrf_token %}
+                    <input id="username" type=text placeholder='Username, email or mobile'>
+                    <input id="password" type=password placeholder='Password'>
+                    <button id="signup" onclick="login()">Sign in</button>
+                    <p id="message"></p>
+                </td></tr>
+                <tr><td><label><input id="remember" type="checkbox">Remember me</label></td></tr>
+                <tr><td>&nbsp;</td></tr>
+                <tr><td id="forgot"><a href="#">Forgot your password?</a></td></tr>
+                <tr><td id="vfiller">&nbsp;</td></tr>
+                <tr><td>Don't have an m.box account and want to make your digital assets searchable? Sign up today!</td></tr>
+                <tr><td><button id="signup">Sign up</button></td></tr>
+            </table>
+        </div>
+        <div id="right-filler"></div>
+    </div>
+</body>
+</html>

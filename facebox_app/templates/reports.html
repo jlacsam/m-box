@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>m.box Reports</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+</head>
+<body>
+    <div id="header" class="header">
+        <span class="logo">m.box</span>
+        <span class="title-bar"><table id="title-bar"><tr>
+            <td><table id="menu-bar"><tr>
+                <td id="videos-tab" onclick="goToVideos()">Videos</td>
+                <td id="photos-tab" onclick="goToPhotos()">Photos</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
+                <td id="faces-tab" onclick="goToFaces()">Faces</td>
+                <td id="voices-tab" onclick="goToVoices()">Voices</td>
+                <td id="menu-separator">&nbsp;</td>
+                <td id="reports-tab">Reports</td>
+                </tr></table></td>
+            <td id="filler-space"></td>
+            <td><table id="tool-bar"><tr>
+                <td id="username">Hi {{ user.username }}!</td>
+                <td id="profile">&#x1F466</td>
+                <td id="settings">&#x2699</td></tr></table></td>
+            </tr>
+            </table>
+        </span>
+    </div>
+    <div id="popup-menu" class="popup-hidden">
+        <div id="editor-status">Editing allowed</div>
+        <div><hr></div>
+        <div class="menu-item"><a href="logout/">Sign out</a></div>
+    </div>
+    <div id="settings-menu" class="popup-hidden">
+        <ul id="max-rows-options">
+            <li id="li-10" onclick="setMaxRows(10)">Max rows: 10</li> 
+            <li id="li-25" onclick="setMaxRows(25)">Max rows: 25</li> 
+            <li id="li-50" onclick="setMaxRows(50)">Max rows: 50</li> 
+            <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
+        </ul>
+    </div>
+    <div id="reports-menu">
+        <span id="audit-records" class="report-item" onclick="showAudit(0)">Audit records</span>
+        <span id="folder-counts" class="report-item" onclick="showFolders(1)">Folder counts</span>
+    </div>
+    <div id="container">
+        <div id="results-div" class="results-div">
+        </div>
+    </div>
+    <script>
+        const q_allow_edit = '{{ allow_edit }}';
+    </script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/reports.js' %}"></script>
+</body>
+</html>

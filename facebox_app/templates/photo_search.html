@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhotoBox</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+</head>
+<body>
+    <div id="header" class="header">
+        <span class="logo">m.box</span>
+        <span class="title-bar"><table id="title-bar"><tr>
+            <td><table id="menu-bar"><tr>
+                <td id="videos-tab" onclick="goToVideos()">Videos</td>
+                <td id="photos-tab">Photos</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
+                <td id="faces-tab" onclick="goToFaces()">Faces</td>
+                <td id="voices-tab" onclick="goToVoices()">Voices</td>
+                <td id="menu-separator">&nbsp;</td>
+                <td id="reports-tab" onclick="goToReports()">Reports</td>
+                </tr></table></td>
+            <td id="filler-space"></td>
+            <td><table id="tool-bar"><tr>
+                <td id="username">Hi {{ user.username }}!</td>
+                <td id="profile">&#x1F466</td>
+                <td id="settings">&#x2699</td></tr></table></td>
+            </tr>
+            </table>
+        </span>
+    </div>
+    <div id="popup-menu" class="popup-hidden">
+        <div id="editor-status">Editing allowed</div>
+        <div><hr></div>
+        <div class="menu-item"><a href="logout/">Sign out</a></div>
+    </div>
+    <div id="settings-menu" class="popup-hidden">
+        <ul id="max-rows-options">
+            <li id="li-10" onclick="setMaxRows(10)">Max rows: 10</li> 
+            <li id="li-25" onclick="setMaxRows(25)">Max rows: 25</li> 
+            <li id="li-50" onclick="setMaxRows(50)">Max rows: 50</li> 
+            <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="search-container">
+            <input id="search-box" type="search" class="search" placeholder="[Search photos]">
+            <p>&nbsp</p>
+            <button id="search-button" class="button">Search</button>
+            <button id="reset-button" class="button">Reset</button>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <table><tr>
+            <td>
+                <span id="results-label">Showing records in</span>
+                <span id="bread-crumbs" onclick="browseFolder()">[all folders]</span>
+            </td>
+            <td class="paging-buttons">
+                <button id="top-page" class="paging-button">Top</button>
+                <button id="prev-page" class="paging-button">Previous</button>
+                <button id="next-page" class="paging-button">Next</button>
+            </td>
+        </tr></table>
+    </div>
+
+    <div id="results">
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>File ID</th>
+                    <th>Thumbnail</th>
+                    <th>Name</th>
+                    <th>File Type</th>
+                    <th>Media Source</th>
+                    <th>Size</th>
+                    <th>Date Created</th>
+                    <th>Date Uploaded</th>
+                    <th>Description</th>
+                    <th>Tags</th>
+                    <th>People</th>
+                    <th>Places</th>
+                    <th>Texts</th>
+                    <th>Last Accessed</th>
+                    <th>Owner Name</th>
+                    <th>Group Name</th>
+                    <th>Remarks</th>
+                    <th>Version</th>
+                    <th>File Attributes</th>
+                    <th>Other Metadata</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="results-body">
+                <!-- Results will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="controls">
+        <table><tr>
+            <td id="bottom-results-label">
+                Showing all records
+            </td>
+            <td class="paging-buttons">
+                <button id="bottom-top-page" class="paging-button">Top</button>
+                <button id="bottom-prev-page" class="paging-button">Previous</button>
+                <button id="bottom-next-page" class="paging-button">Next</button>
+            </td>
+        </tr></table>
+    </div>
+
+    <div id="folder-browser" class='folder-browser-hidden'>
+    </div>
+
+    <script>
+        const q_file_id = '{{ file_id }}'; 
+        const q_file_name = '{{ file_name }}';
+        const q_allow_edit = '{{ allow_edit }}';
+    </script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/photo_search.js' %}"></script>
+</body>
+</html>

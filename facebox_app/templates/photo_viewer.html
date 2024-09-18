@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Viewer</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/viewer.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+</head>
+<body>
+    <div id="header" class="header">
+        <span class="logo">m.box</span>
+        <span class="title-bar"><table id="title-bar"><tr>
+            <td><table id="menu-bar"><tr>
+                <td id="videos-tab" onclick="goToVideos()">Videos</td>
+                <td id="photos-tab" onclick="goToPhotos()">Photos</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
+                <td id="faces-tab" onclick="goToFaces()">Faces</td>
+                <td id="voices-tab" onclick="goToVoices()">Voices</td>
+                <td id="menu-separator">&nbsp;</td>
+                <td id="reports-tab" onclick="goToReports()">Reports</td>
+                </tr></table></td>
+            <td id="filler-space"></td>
+            <td><table id="tool-bar"><tr>
+                <td id="username">Hi {{ user.username }}!</td>
+                <td id="profile">&#x1F466</td>
+                <td id="settings">&#x2699</td></tr></table></td>
+            </tr>
+            </table>
+        </span>
+    </div>
+    <div id="popup-menu" class="popup-hidden">
+        <div id="editor-status">Editing allowed</div>
+        <div><hr></div>
+        <div class="menu-item"><a href="logout/">Sign out</a></div>
+    </div>
+    <div id="settings-menu" class="popup-hidden">
+        <div id="menu-audit" class=menu-item onclick="toggleAudit()">Show audit</div>
+    </div>
+    <div id="container">
+        <table><tr>
+            <td id="photo-view"> <!-- Video and details -->
+                <div id="media-container">
+                    <img id="photo-viewer" alt="high resolution photo">
+                </div>
+            </td>
+            <td id="details-view">
+                <table id="details-table">
+                    <tr><td><div class="detail_label">Folder</div>
+                            <div>
+                                <span id="detail-folder-name" class="detail_value" onclick="browseFolder()">folder</span>
+                                <span id="detail-file-position" class="detail_info">file position</span>
+                                <span id="detail-file-count" class="detail_info">file count</span>
+                            </div></td></tr>
+                    <tr><td><div class="detail_label">Name</div>
+                            <div class="detail_file">
+                                <span id="detail-file-name" class="detail_value">filename.mp4</span>
+                                <span id="detail-file-id" class="detail_info">(0)</span>
+                                <span id="detail-archive-url" class="detail_download" title="Download the archive copy" onclick="downloadArchiveCopy()">&#x2B07</span>
+                            </div></td></tr>
+                    <tr><td><div class="detail_label">Description</div>
+                            <div id="detail-description" class="detail_editable">Description</div></td></tr>
+                    <tr><td><div class="detail_label">Tags</div>
+                            <div id="detail-tags" class="detail_editable">Tags</div></td></tr>
+                    <tr><td><div class="detail_label">People</div>
+                            <div id="detail-people" class="detail_editable">People</div></td></tr>
+                    <tr><td><div class="detail_label">Places</div>
+                            <div id="detail-places" class="detail_editable">Places</div></td></tr>
+                    <tr><td><div class="detail_label">Texts</div>
+                            <div id="detail-texts" class="detail_editable">Texts</div></td></tr>
+                    <tr><td><div class="detail_label">Remarks</div>
+                            <div id="detail-remarks" class="detail_editable">Remarks</div></td></tr>
+                    <tr><td><div class="detail_label">File Type</div>
+                            <div id="detail-file-type" class="detail_value">MP4</div></td></tr>
+                    <tr><td><div class="detail_label">Media Source</div>
+                            <div id="detail-media-type" class="detail_value">VHS</div></td></tr>
+                    <tr><td><div class="detail_label">File Size</div>
+                            <div id="detail-file-size" class="detail_value">987,654,321 bytes</div></td></tr>
+                    <tr><td><div class="detail_label">Version</div>
+                            <div id="detail-version" class="detail_value">1</div></td></tr>
+                    <tr><td><div class="detail_label">Date Created</div>
+                            <div id="detail-created" class="detail_value">2024/08/09 00:01:02AM</div></td></tr>
+                    <tr><td><div class="detail_label">Date Uploaded</div>
+                            <div id="detail-uploaded" class="detail_value">2024/08/09 03:04:05AM</div></td></tr>
+                    <tr><td><div class="detail_label">Last Accessed</div>
+                            <div id="detail-accessed" class="detail_value">N/A</div></td></tr>
+                    <tr><td><div class="detail_label">Owner Name</div>
+                            <div id="detail-owner_name" class="detail_editable">Owner</div></td></tr>
+                    <tr><td><div class="detail_label">Group Name</div>
+                            <div id="detail-group_name" class="detail_editable">Group</div></td></tr>
+                    <tr><td><div class="detail_label">File Attributes</div>
+                            <div id="detail-attributes" class="detail_value">width:1920,height:1080,frame_rate:29.97</div></td></tr>
+                    <tr><td><div class="detail_label">Other Metadata</div>
+                            <div id="detail-extra_data" class="detail_editable">None</div></td></tr>
+                    <tr><td><div class="detail_label">Status</div>
+                            <div id="detail-status" class="detail_editable">For review</div></td></tr>
+                    <tr><td id="nav-buttons">
+                            <button id="first-photo" class="button" onclick="getFirstPhoto()">First</button>
+                            <button id="prev-photo" class="button" onclick="getAdjacentPhoto('backward')">Prev</button>
+                            <button id="check-next" class="button" onclick="checkNextPhoto()">&#x2713+Next</button>
+                            <button id="next-for-review" class="button" onclick="getAdjacentPhoto('forward','Reviewed')">Next-?</button>
+                            <button id="next-photo" class="button" onclick="getAdjacentPhoto('forward')">Next</button>
+                            <button id="last-photo" class="button" onclick="getLastPhoto()">Last</button></td><tr>
+                </table>
+            </td>
+            <td id="audit-log" class="audit-hidden">Audit log will go here.</td>
+        </tr></table>
+    </div>
+    <div id="editor-div" class="editor-hidden">
+        <textarea id="editor-textarea" type="text" name="editor">&nbsp;</textarea>
+        <select id="editor-select" name="options">
+            <option value="1">For review</option>
+            <option value="2">Reviewed</option>
+        </select>
+        <div id="editor-buttons">
+            <button id="editor-ok" class="editor-button" onclick="saveEdits()">&#x2713</button>
+            <button id="editor-cancel" class="editor-button" onclick="cancelEdits()">&#x10102</button>
+        </div>
+    </div>
+    <div id="folder-browser" class='folder-browser-hidden'>
+    </div>
+    <script>
+        const q_file_id = '{{ file_id }}'; 
+        const q_file_name = '{{ file_name }}';
+        const q_allow_edit = '{{ allow_edit }}';
+    </script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/photo_viewer.js' %}"></script>
+</body>
+</html>
