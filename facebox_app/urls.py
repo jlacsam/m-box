@@ -26,6 +26,7 @@ urlpatterns = [
     path('get-file-count/<int:folder_id>/', views.get_file_count, name='get_file_count'),
     path('get-file-position/<int:file_id>/', views.get_file_position, name='get_file_position'),
     path('refresh-folder-stats/<int:folder_id>/', views.refresh_folder_stats, name='refresh_folder_stats'),
+    path('search-audit/', views.search_audit, name='search_audit'),
     path('search-face/', views.search_face, name='search_face'),
     path('search-voice/', views.search_voice, name='search_voice'),
     path('search-voice-by-ref/<int:voice_id>/', views.search_voice_by_ref, name='search_voice_by_ref'),

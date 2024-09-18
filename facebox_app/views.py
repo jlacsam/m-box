@@ -1018,6 +1018,50 @@ def get_audit(request,file_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
+# Search audit records #############################################################################
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_audit(request):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+    max_rows = request.headers.get('Max-Rows')
+    username = request.headers.get('Username')
+    start_date = request.headers.get('Start-Date')
+    end_date = request.headers.get('End-Date')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Search for matching records in the database
+    labels = ['audit_id', 'username', 'activity', 'event_timestamp', 'location', 'table_name', 
+        'record_id', 'old_data', 'new_data', 'remarks']
+    rows = []
+    query = """
+        SELECT audit_id, username, activity, event_timestamp, location, table_name, 
+            record_id, old_data, new_data, remarks
+        FROM fbx_audit
+        WHERE username LIKE %s AND 
+            event_timestamp BETWEEN %s AND %s
+        ORDER BY audit_id DESC
+        LIMIT %s
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, (username, start_date, end_date, max_rows))
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Serialize the results and return the response
+    if len(rows):
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
 # Get segments of speech aka diaries of a file #####################################################
 @csrf_exempt
 @api_view(['GET'])

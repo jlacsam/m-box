@@ -14,7 +14,6 @@ h1 {
 }
 
 table {
-    width: 100%;
     border-collapse: collapse;
 }
 
@@ -93,6 +92,7 @@ ul li:hover {
     width: 100%;
     margin: 0 auto;
     padding: 0px;
+    box-sizing: border-box;
 }
 
 .popup-hidden {
@@ -275,7 +275,7 @@ ul li:hover {
 }
 
 .results-table {
-    width: 100%;
+    table-layout: fixed;
     font-size: 0.8em;
     border-collapse: collapse;
     margin: 15px
@@ -317,5 +317,43 @@ ul li:hover {
 
 .results-div {
     display: flex;
+    flex-direction: column;
     width: 100%;
+    box-sizing: border-box;
+}
+
+.audit-elements {
+    flex: 1;
+    box-sizing: border-box;
+}
+
+.search-input-wrapper {
+	 position: relative;
+	 display: inline-block;
+    margin-top: 15px;
+    margin-left: 15px;
+}
+
+.search-input {
+	 padding-right: 30px; /* Space for the clear button */
+}
+
+.clear-button {
+	 position: absolute;
+	 right: 5px;
+	 top: 50%;
+	 transform: translateY(-50%);
+	 display: none;
+	 cursor: pointer;
+	 font-size: 18px;
+	 color: #999;
+}
+
+.search-button {
+    height: 24px;
+    border-radius: 12px;
+}
+
+.search-input-wrapper:hover .clear-button {
+	 display: block;
 }

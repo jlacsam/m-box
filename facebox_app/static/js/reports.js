@@ -64,9 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     reportsTab.style.color = '#ffffff';
 
     setMaxRows(maxRows);
-
-    showAudit(0);
-    //showFolders();
+    showAudit();
 });
 
 function getFileCount(folder_id) {
@@ -89,21 +87,54 @@ function getFileCount(folder_id) {
     });
 }
 
-function showAudit(file_id) {
+function toggleClearButton() {
+    const searchInput = document.getElementById('username-search');
+    const clearButton = document.getElementById('clear-button');
+    
+    if (searchInput.value.length > 0) {
+        clearButton.style.display = 'block';
+    } else {
+        clearButton.style.display = 'none';
+    }
+}
 
+function clearSearch() {
+    const searchInput = document.getElementById('username-search');
+    searchInput.value = '';
+    toggleClearButton();
+}
+
+function searchAudit() {
     const auditRecords = document.getElementById('audit-records');
     auditRecords.style.color = '#ffffff';
     const folderCounts = document.getElementById('folder-counts');
     folderCounts.style.color = '#888888';
 
+    let username = document.getElementById('username-search').value;
+    let start_date = document.getElementById('start-date').value;
+    let end_date = document.getElementById('end-date').value;
+
+    if (username == null || username.trim().length == 0) username = '%';
+    username = username.replace('*','%');
+
+    if (start_date == null || start_date.trim().length == 0) {
+       start_date = '2024/1/1 00:00:00.000';
+    }
+    if (end_date == null || end_date.trim().length == 0) {
+        const timeNow = new Date();
+        end_date = timeNow.toISOString();
+    }
+
     const csrftoken = getCookie('csrftoken');
-    fetch(`/api/get-audit/${file_id}/`, {
+    fetch('/api/search-audit/', {
         method: 'GET',
         headers: {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'Max-Rows': maxRows,
-            'Source-Table': 'mbx_file',
+            'Username': username,
+            'Start-Date': start_date,
+            'End-Date': end_date,
             'X-CSRFToken': csrftoken,
         }
     })
@@ -120,14 +151,36 @@ function showAudit(file_id) {
     });
 }
 
+function showAudit() {
+
+    const auditRecords = document.getElementById('audit-records');
+    auditRecords.style.color = '#ffffff';
+    const folderCounts = document.getElementById('folder-counts');
+    folderCounts.style.color = '#888888';
+
+    const resultsDiv = document.getElementById('results-div');
+    let html = `<div class='audit-elements'>
+        <div class="search-input-wrapper">
+            <input type="text" id="username-search" class="search-input" placeholder="[Search username]" 
+                oninput="toggleClearButton()">
+            <span class="clear-button" id="clear-button" onclick="clearSearch()">&#10006;</span>
+        </div>
+        <input type="date" id="start-date">
+        <input type="date" id="end-date">
+        <button onclick="searchAudit()" class="search-button">Search</button>
+    </div>
+    <div id='audit-log' class='audit-elements'></div>`;
+    resultsDiv.innerHTML = html;
+
+    searchAudit();
+}
+
 function displayAudit(results) {
-    const auditLog = document.getElementById('results-div');
+    const auditLog = document.getElementById('audit-log');
     if (results.length === 0) {
-        auditLog.innerHTML = 'No audit records yet.';
+        auditLog.innerHTML = `<table class='results-table'><tr><td>No audit records found.</td></tr></table>`;
         return;
     }
-
-    auditLog.style.maxHeight = window.innerHeight + 'px';
 
     let html = `<table class='results-table'><tr><th>Audit ID</th><th>Username</th><th>Action</th><th>Timestamp</th>
         <th>Location</th><th>Table</th><th>Record ID</th><th>Old Data</th><th>New Data</th><th>Remarks</th></tr>`;
