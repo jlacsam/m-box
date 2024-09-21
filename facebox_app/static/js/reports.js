@@ -410,6 +410,11 @@ function setMaxRows(value) {
 }
 
 function refreshFolderStats(folder_id) {
+    if (!q_is_supervisor) {
+        alert('You are not authorized to perform this action.');
+        return;
+    }
+
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/refresh-folder-stats/${folder_id}/`, {
         method: 'PATCH',

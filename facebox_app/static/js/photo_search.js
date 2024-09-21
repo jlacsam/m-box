@@ -7,7 +7,7 @@ let currentPage = 1;
 let totalPages = 1;
 let recordSet = null;
 let currentFolder = '/';
-let maxRows = 10;
+let maxRows = 25;
 
 document.addEventListener('DOMContentLoaded', function() {
     const searchBox = document.getElementById('search-box');

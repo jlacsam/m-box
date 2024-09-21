@@ -52,7 +52,8 @@
         </div>
     </div>
     <script>
-        const q_allow_edit = ('{{ allow_edit }}' === 'True');
+        const q_is_editor = ('{{ is_editor}}' === 'True');
+        const q_is_supervisor = ('{{ is_supervisor }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'js/reports.js' %}"></script>

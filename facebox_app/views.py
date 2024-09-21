@@ -1236,11 +1236,13 @@ def voice_search(request):
 def reports_viewer(request):
     groups = request.user.groups.all()
     is_editor = groups.filter(name=settings.MBOX_EDITORS_GROUP).exists()
+    is_supervisor = groups.filter(name=settings.MBOX_SUPERVISORS_GROUP).exists()
     context = { 
         'file_id':request.GET.get('file_id','0'), 
         'file_name':request.GET.get('file_name',''),
         'username':request.user.first_name,
-        'allow_edit': is_editor,
+        'is_editor': is_editor,
+        'is_supervisor': is_supervisor,
     }
     return render(request, 'reports.html', context)
 

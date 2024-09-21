@@ -279,6 +279,7 @@ function getMedia(file_id) {
 
 function getFirstPhoto(folder_id = null,fn = null) {
     showBusy();
+    cancelEdits();
     if (folder_id == null) folder_id = selectedFolder;
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-adjacent-media/0/`, {
@@ -324,6 +325,7 @@ function getFirstPhoto(folder_id = null,fn = null) {
 
 function getAdjacentPhoto(direction='forward', skipList='--NONE--') {
     showBusy();
+    cancelEdits();
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-adjacent-media/${selectedFile}/`, {
         method: 'GET',
@@ -363,6 +365,7 @@ function getAdjacentPhoto(direction='forward', skipList='--NONE--') {
 
 function getLastPhoto() {
     showBusy();
+    cancelEdits();
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-adjacent-media/${INT_MAX}/`, {
         method: 'GET',
@@ -657,6 +660,7 @@ function browseFolder(parent_id = 1) {
 }
 
 function selectFolder(folder) {
+    cancelEdits();
     const folderBrowser = document.getElementById('folder-browser');
     if (folderBrowser.classList.contains('folder-browser-visible')) {
         folderBrowser.classList.remove('folder-browser-visible');
@@ -726,6 +730,8 @@ function checkNextPhoto() {
         return;
     }
 
+    cancelEdits();
+
     let pair = { 'status' : APPROVED_STATUS };
 
     const csrftoken = getCookie('csrftoken');
@@ -740,6 +746,7 @@ function checkNextPhoto() {
     })
     .then(response => response.json())
     .then(data => {
+        document.getElementById('detail-status').innerHTML = APPROVED_STATUS;
         getAdjacentPhoto('forward');
     })
     .catch(error => {

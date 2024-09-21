@@ -1,6 +1,6 @@
 const SUBSCRIPTION_ID = '00000000';
 const CLIENT_SECRET = '00000000';
-const MAX_ROWS = 10;
+const MAX_ROWS = 25;
 const MSG_DEFAULT1 = 'Drag and drop a JPEG image here.';
 const MSG_DEFAULT2 = 'Or, click search to see all unique faces in the selected video.';
 
