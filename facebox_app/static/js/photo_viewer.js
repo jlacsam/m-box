@@ -234,11 +234,20 @@ function updateFile() {
 }
 
 function cancelEdits() {
-    const editable = document.getElementById(editorText.getAttribute('original-id'));
+    if (editorDiv == null) return;
+    if (editorDiv.classList.contains('editor-visible')) {
+        editorDiv.classList.remove('editor-visible');
+    }
 
-    editorDiv.classList.remove('editor-visible');
-    editorDiv.classList.add('editor-hidden');
+    if (!editorDiv.classList.contains('editor-hidden')) {
+        editorDiv.classList.add('editor-hidden');
+    }
 
+    if (editorText == null) return;
+    const element_id = editorText.getAttribute('original-id');
+    if (element_id == null) return;
+
+    const editable = document.getElementById(element_id);
     editable.innerHTML = editorText.getAttribute('original-value');
 }
 
@@ -449,6 +458,7 @@ function getFilePosition(file_id,folder_id) {
 
 function showMedia(data) {
     const photoViewer = document.getElementById('photo-viewer');
+    photoViewer.src = '';
     photoViewer.src = data.file_url;
 }
 
