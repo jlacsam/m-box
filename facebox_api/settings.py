@@ -137,11 +137,15 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# In a Docker environment, this environment variable will NOT be defined
+# In a Docker environment, this environment variables will NOT be defined
 # because it is already defined in the YAML file
 MEDIA_ROOT = os.environ.get('MBOX_MEDIA_ROOT') 
 if not MEDIA_ROOT:
     MEDIA_ROOT = '/mbox/thumbnails/'
+
+LOG_DIRECTORY = os.environ.get('MBOX_LOG_DIRECTORY')
+if not LOG_DIRECTORY:
+    LOG_DIRECTORY = '/mbox/logs/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -195,3 +199,46 @@ REST_USE_JWT = True
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/app/videos/'
 
+XLOGGING = {
+       'version': 1,
+       'disable_existing_loggers': False,
+       'handlers': {
+           'file': {
+               'level': 'INFO',
+               'class': 'logging.handlers.RotatingFileHandler',
+               'filename': LOG_DIRECTORY + 'django.log',
+               'maxBytes': int(os.environ.get('MBOX_LOG_SIZE')),
+               'backupCount': 10,
+           },
+           'mail_admins': {
+               'level': 'ERROR',
+               'class': 'django.utils.log.AdminEmailHandler',
+           }
+       },
+       'root': {
+           'handlers': ['file'],
+           'level': os.environ.get('MBOX_ROOT_LOGLEVEL'), 
+       },
+       'loggers': {
+           'django': {
+               'handlers': ['file'],
+               'level': os.environ.get('MBOX_DJANGO_LOGLEVEL'), 
+               'propagate': False,
+           },
+           'django.request': {
+               'handlers': ['mail_admins'],
+               'level': os.environ.get('MBOX_REQUEST_LOGLEVEL'),
+               'propagate': False,
+           },
+           'django.db.backends': {
+               'handlers': ['file'],
+               'level': os.environ.get('MBOX_BACKENDS_LOGLEVEL'),
+               'propagate': False,
+           },
+           'mbox': {
+               'handlers': ['file'],
+               'level': os.environ.get('MBOX_APP_LOGLEVEL'),
+               'propagate': False,
+           },
+       },
+   }

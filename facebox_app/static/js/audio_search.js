@@ -90,14 +90,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     audiosTab.style.color = '#ffffff';
 
-    const editorStatus = document.getElementById('editor-status');
-    editorStatus.innerHTML = q_allow_edit ? 'Editing allowed' : 'Read-only';
-
     setMaxRows(maxRows);
+    getGroups();
 
     // Initial load
     performSearch();
 });
+
+function getGroups() {
+    const csrftoken = getCookie('csrftoken');
+    fetch('/api/get-groups/', {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayGroups(data.groups);
+        if (data.groups.includes('Editors')) {
+            isEditor = true;
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function displayGroups(groups) {
+    const userGroups = document.getElementById('user-groups');
+    let html = `<p class='groups-label'>Groups</p>`;
+    groups.forEach(group => {
+        html += `<p class='group-name'>- ${group}</p>`;
+    });
+    userGroups.innerHTML = html;
+}
 
 function performSearch() {
     /* Valid cases:

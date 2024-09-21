@@ -18,6 +18,7 @@ urlpatterns = [
     path('get-diary/<int:file_id>/', views.get_diary, name='get_diary'),
     path('get-folder/<int:folder_id>/', views.get_folder, name='get_folder'),
     path('get-folders/<int:parent_id>/', views.get_folders, name='get_folders'),
+    path('get-groups/', views.get_groups, name='get_groups'),
     path('get-image/<int:face_id>/', views.get_face_image, name='get_face_image'),
     path('get-transcript/<int:file_id>/', views.get_transcript, name='get_transcript'),
     path('get-media/<int:file_id>/', views.get_media, name='get_media'),

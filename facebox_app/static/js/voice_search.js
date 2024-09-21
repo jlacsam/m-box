@@ -165,6 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
     voicesTab.style.color = '#ffffff';
 
     setMaxRows(maxRows);
+    getGroups();
 
     // A query parameter was passed to the page, display all faces associated with the file_id
     if (parseInt(q_file_id) > 0) {
@@ -174,6 +175,37 @@ document.addEventListener('DOMContentLoaded', function() {
         searchPersons();
     }
 });
+
+function getGroups() {
+    const csrftoken = getCookie('csrftoken');
+    fetch('/api/get-groups/', {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayGroups(data.groups);
+        if (data.groups.includes('Editors')) {
+            isEditor = true;
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function displayGroups(groups) {
+    const userGroups = document.getElementById('user-groups');
+    let html = `<p class='groups-label'>Groups</p>`;
+    groups.forEach(group => {
+        html += `<p class='group-name'>- ${group}</p>`;
+    });
+    userGroups.innerHTML = html;
+}
 
 function performSearch() {
     const searchBox = document.getElementById('search-box');
@@ -796,6 +828,9 @@ function toggleAudit() {
 }
 
 function getAudit(file_id) {
+    const auditLog = document.getElementById('audit-log');
+    if (auditLog.classList.contains('audit-hidden')) return;
+
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-audit/${file_id}/`, {
         method: 'GET',
@@ -830,14 +865,14 @@ function displayAudit(results) {
     let html = '<table><tr><td><p style="font-weight:bold; color:black;">AUDIT LOG</p><br></td></tr>';
     results.forEach(item => {
         html += `<tr><td>
-            <p class='audit-detail'>${item.audit_id}</p>
-            <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
-            <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
-            <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
-            <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
-            <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;${formatJsonString(item.old_data)}</p>
-            <p class='audit-detail'><span class='audit-key'>New Data:<span>&nbsp;${formatJsonString(item.new_data)}</p>
-            <hr></td></tr>`;
+        <p class='audit-detail'>${item.audit_id} (${item.record_id})</p>
+        <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
+        <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
+        <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
+        <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
+        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></p>
+        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></p>
+        <hr></td></tr>`;
     });
     html += '</table>';
 

@@ -1,6 +1,7 @@
 const SUBSCRIPTION_ID = '00000000';
 const CLIENT_SECRET = '00000000';
 const FILE_STATUSES = ['For review','Reviewed'];
+const APPROVED_STATUS = 'Reviewed';
 const INT_MAX = 2147483647;
 const FOLDER_ICON = '\u{1F4C1}';
 const FOLDER_WIDTH = 20;
@@ -126,6 +127,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    getGroups();
+
     if (parseInt(q_file_id) > 0) {
         selectedFile = q_file_id;
         selectedFileName = q_file_name;
@@ -133,9 +136,42 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function getGroups() {
+    const csrftoken = getCookie('csrftoken');
+    fetch('/api/get-groups/', {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayGroups(data.groups);
+        if (data.groups.includes('Editors')) {
+            isEditor = true;
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function displayGroups(groups) {
+    const userGroups = document.getElementById('user-groups');
+    let html = `<p class='groups-label'>Groups</p>`;
+    groups.forEach(group => {
+        html += `<p class='group-name'>- ${group}</p>`;
+    });
+    userGroups.innerHTML = html;
+}
+
 function showEditor(editable,inputtype='textarea',options=[]) {
-    if (!q_allow_edit)
+    if (!q_allow_edit) {
+        alert('You are not allowed to edit.');
         return;
+    }
 
     if (editorDiv == null) {
         editorDiv = document.getElementById('editor-div');
@@ -343,6 +379,7 @@ function getFirstMedia(folder_id = null,fn = null) {
                     showDetails(data.results[0]);
                     showMedia(data.results[0]);
                     showTranscript(selectedFile);
+                    getAudit(selectedFile);
                     document.getElementById('detail-file-position').innerHTML = '(1 of ';
                     if (fn) fn(data.results[0]);
                 } else {
@@ -358,7 +395,7 @@ function getFirstMedia(folder_id = null,fn = null) {
     });
 }
 
-function getAdjacentMedia(direction='forward',skipList='--NONE--') {
+function getAdjacentMedia(direction='forward', skipList='--NONE--') {
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-adjacent-media/${selectedFile}/`, {
         method: 'GET',
@@ -383,6 +420,7 @@ function getAdjacentMedia(direction='forward',skipList='--NONE--') {
                 showDetails(data.results[0]);
                 showMedia(data.results[0]);
                 showTranscript(selectedFile);
+                getAudit(selectedFile);
                 getFilePosition(selectedFile,selectedFolder);
             } else {
                 alert('No more records.');
@@ -420,6 +458,7 @@ function getLastMedia() {
                     showDetails(data.results[0]);
                     showMedia(data.results[0]);
                     showTranscript(selectedFile);
+                    getAudit(selectedFile);
                     document.getElementById('detail-file-position').innerHTML = '(' + totalFiles + ' of ';
                 } else {
                     alert('You are already at the bottom of the list.');
@@ -621,6 +660,9 @@ function toggleAudit() {
 }
 
 function getAudit(file_id) {
+    const auditLog = document.getElementById('audit-log');
+    if (auditLog.classList.contains('audit-hidden')) return;
+
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-audit/${file_id}/`, {
         method: 'GET',
@@ -641,7 +683,6 @@ function getAudit(file_id) {
         }
     })
     .catch(error => {
-        console.log(error);
         alert('Unable to save data. Error:', error);
     });
 }
@@ -658,14 +699,14 @@ function displayAudit(results) {
     let html = '<table><tr><td><p style="font-weight:bold; color:black;">AUDIT LOG</p><br></td></tr>';
     results.forEach(item => {
         html += `<tr><td>
-            <p class='audit-detail'>${item.audit_id}</p>
-            <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
-            <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
-            <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
-            <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
-            <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;${formatJsonString(item.old_data)}</p>
-            <p class='audit-detail'><span class='audit-key'>New Data:<span>&nbsp;${formatJsonString(item.new_data)}</p>
-            <hr></td></tr>`;
+        <p class='audit-detail'>${item.audit_id} (${item.record_id})</p>
+        <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
+        <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
+        <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
+        <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
+        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></p>
+        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></p>
+        <hr></td></tr>`;
     });
 
     auditLog.innerHTML = html;

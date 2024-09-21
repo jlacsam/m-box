@@ -31,7 +31,7 @@
         </span>
     </div>
     <div id="popup-menu" class="popup-hidden">
-        <div id="editor-status">Editing allowed</div>
+        <div id="user-groups">Editing allowed</div>
         <div><hr></div>
         <div class="menu-item"><a href="/logout/">Sign out</a></div>
     </div>
@@ -52,7 +52,7 @@
         </div>
     </div>
     <script>
-        const q_allow_edit = '{{ allow_edit }}';
+        const q_allow_edit = ('{{ allow_edit }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'js/reports.js' %}"></script>

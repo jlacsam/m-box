@@ -61,7 +61,7 @@ function formatGMTToLocal(dateString) {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
 }
 
-function formatJsonString(jsonString,style=1) {
+function formatJsonString(jsonString) {
   function syntaxHighlight(json) {
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
@@ -82,30 +82,9 @@ function formatJsonString(jsonString,style=1) {
   }
 
   let obj = JSON.parse(jsonString);
-  let formattedJson = JSON.stringify(obj, null, 2);
+  let formattedJson = JSON.stringify(obj, null, 2).replace(/\n+/g,' ');
   let highlightedJson = syntaxHighlight(formattedJson);
-  let finalJson = '';
-
-  if (style == 1) {
-    finalJson = `
-    <pre style="background-color: #f4f4f4; padding: 0px; border-radius: 5px; overflow: auto; white-space: pre-wrap; word-wrap: break-word;">
-      <code style="font-family: monospace;">${highlightedJson}</code>
-    </pre>`;
-  } else {
-    finalJson = `
-    <pre style="padding: 0px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; margin: 0px;">
-      <code style="font-family: monospace;">${highlightedJson}</code>
-    </pre>`;
-  }
-  return finalJson + `
-    <style>
-      .string { color: #00c000; word-break: break-word; }
-      .number { color: #0000ff; }
-      .boolean { color: #b22222; }
-      .null { color: #808080; }
-      .key { color: #c52a2a; }
-    </style>
-  `;
+  return highlightedJson;
 }
 
 function formatSize(bytes) {

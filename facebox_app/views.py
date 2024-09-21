@@ -17,7 +17,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, FileResponse, HttpResponse, StreamingHttpResponse
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
 from azure.storage.blob import BlobServiceClient
@@ -865,6 +865,28 @@ def refresh_folder_stats(request, folder_id):
         return Response({'rowcount':rowcount}, status=status.HTTP_200_OK)
 
 
+# Get groups of the specified user ################################################################
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_groups(request):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    groups = list(request.user.groups.all())
+    for i, group in enumerate(groups):
+        if group.name == settings.MBOX_SUPERVISORS_GROUP:
+            groups[i] = 'Supervisors'
+        if group.name == settings.MBOX_EDITORS_GROUP:
+            groups[i] = 'Editors'
+
+    return Response({'groups':groups}, status=status.HTTP_200_OK)
+
+
 # Search the fbx_person table ######################################################################
 @csrf_exempt
 @api_view(['GET'])
@@ -997,7 +1019,8 @@ def get_audit(request,file_id):
             rows = cursor.fetchall()
     else:
         query = """
-            SELECT audit_id, username, activity, event_timestamp, old_data, new_data
+            SELECT audit_id, username, activity, event_timestamp, location, table_name,
+                record_id, old_data, new_data, remarks
             FROM fbx_audit
             WHERE record_id = %s AND table_name = %s
             ORDER BY audit_id DESC

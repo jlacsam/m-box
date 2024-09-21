@@ -751,3 +751,20 @@ tr.highlighted {
     border-left: 1px solid white;
 }
 
+.groups-label {
+    font-weight: bold;
+    padding: 0px;
+    margin: 0px;
+}
+
+.group-name {
+    margin: 0px 0px 0px 10px;
+    padding: 0px;
+}
+
+.json-highlight .string { color: #00c000; word-break: break-word; }
+.json-highlight .number { color: #0000ff; }
+.json-highlight .boolean { color: #b22222; }
+.json-highlight .null { color: #808080; }
+.json-highlight .key { color: #c52a2a; }
+

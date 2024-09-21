@@ -65,7 +65,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setMaxRows(maxRows);
     showAudit();
+    getGroups();
 });
+
+function getGroups() {
+    const csrftoken = getCookie('csrftoken');
+    fetch('/api/get-groups/', {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayGroups(data.groups);
+        if (data.groups.includes('Editors')) {
+            isEditor = true;
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function displayGroups(groups) {
+    const userGroups = document.getElementById('user-groups');
+    let html = `<p class='groups-label'>Groups</p>`;
+    groups.forEach(group => {
+        html += `<p class='group-name'>- ${group}</p>`;
+    });
+    userGroups.innerHTML = html;
+}
 
 function getFileCount(folder_id) {
     const csrftoken = getCookie('csrftoken');
@@ -193,8 +225,8 @@ function displayAudit(results) {
             <td>${item.location == null ? '-' : item.location}</td>
             <td>${item.table_name == null ? '-' : item.table_name.substring(4)}</td>
             <td>${item.record_id == null ? '-' : item.record_id}</td>
-            <td>${formatJsonString(item.old_data,2)}</td>
-            <td>${formatJsonString(item.new_data,2)}</td>
+            <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></td>
+            <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></td>
             <td>${item.remarks == null ? '-' : item.remarks}</td>
             </tr>`;
     });

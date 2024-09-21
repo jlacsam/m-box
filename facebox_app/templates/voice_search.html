@@ -31,9 +31,9 @@
         </span>
     </div>
     <div id="popup-menu" class="popup-hidden">
-        <div id="editor-status">Editing allowed</div>
+        <div id="user-groups">Editing allowed</div>
         <div><hr></div>
-        <div class="menu-item"><a href="{% url 'django_auth_adfs:logout' %}">Sign out</a></div>
+        <div class="menu-item"><a href="/logout/">Sign out</a></div>
     </div>
     <div id="settings-menu" class="popup-hidden">
         <div id="menu-audit" class=menu-item onclick="toggleAudit()">Show audit</div>
@@ -104,7 +104,7 @@
     <script>
         const q_file_id = '{{ file_id }}'; 
         const q_file_name = '{{ file_name }}';
-        const q_allow_edit = '{{ allow_edit }}';
+        const q_allow_edit = ('{{ allow_edit }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'js/voice_search.js' %}"></script>
