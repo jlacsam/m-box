@@ -22,7 +22,7 @@ class FbxAudit(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_audit'
+        db_table = 'mbox_audit'
 
 
 class FbxFace(models.Model):
@@ -41,7 +41,7 @@ class FbxFace(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_face'
+        db_table = 'mbox_face'
 
     def __str__(self):
         return f"{str(self.file.file_id).zfill(6)}_{str(self.face_id).zfill(6)}_{self.confidence:.0f}.jpg"
@@ -89,7 +89,7 @@ class FbxFile(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_file'
+        db_table = 'mbox_file'
 
 
 class FbxFolder(models.Model):
@@ -120,7 +120,7 @@ class FbxFolder(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_folder'
+        db_table = 'mbox_folder'
 
 
 class FbxPerson(models.Model):
@@ -144,7 +144,7 @@ class FbxPerson(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_person'
+        db_table = 'mbox_person'
 
 
 class FbxVoice(models.Model):
@@ -159,7 +159,7 @@ class FbxVoice(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_voice'
+        db_table = 'mbox_voice'
 
 
 class FbxThumbnail(models.Model):
@@ -171,4 +171,4 @@ class FbxThumbnail(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fbx_thumbnail'
+        db_table = 'mbox_thumbnail'

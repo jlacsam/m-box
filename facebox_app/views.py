@@ -26,7 +26,7 @@ from .utils import get_face_embedding, get_voice_embedding, validate_subscriptio
 from .models import FbxPerson, FbxFace, FbxFile, FbxThumbnail, FbxAudit, FbxFolder
 
 
-# Search the fbx_face table ########################################################################
+# Search the mbox_face table ########################################################################
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -69,7 +69,7 @@ def search_face(request):
         SELECT ff.face_id, ff.file_id, ff.person_id, ff.time_start, ff.time_end, ff.box, 
             ff.confidence, ff.merged_to, 1.0 - (embedding <=> %s::vector) AS similarity, 
             fp.full_name, fp.first_name, fp.middle_name, fp.last_name, fl.name AS file_name, fl.file_url
-        FROM fbx_face ff, fbx_person fp, fbx_file fl
+        FROM mbox_face ff, mbox_person fp, mbox_file fl
     """
     with connection.cursor() as cursor:
         if last_face_id == 0:
@@ -106,7 +106,7 @@ def search_face(request):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Search the fbx_voice table using an audio file ###################################################
+# Search the mbox_voice table using an audio file ###################################################
 @csrf_exempt
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
@@ -151,7 +151,7 @@ def search_voice(request):
         SELECT fv.voice_id, fv.file_id, fv.person_id, fv.time_start, fv.time_end,  
             1.0 - (embedding <=> %s::vector) AS similarity, 
             fp.full_name, fp.first_name, fp.middle_name, fp.last_name, ff.name AS file_name, ff.file_url
-        FROM fbx_voice fv, fbx_person fp, fbx_file ff
+        FROM mbox_voice fv, mbox_person fp, mbox_file ff
     """
     with connection.cursor() as cursor:
         if last_voice_id == 0:
@@ -187,8 +187,8 @@ def search_voice(request):
 
 
 ####################################################################################################
-# Search the fbx_voice table using a reference to a segment from another audio file that is already 
-# stored in the fbx_table and has records in the fbx_voice table
+# Search the mbox_voice table using a reference to a segment from another audio file that is already 
+# stored in the mbox_table and has records in the mbox_voice table
 @csrf_exempt
 @permission_classes([IsAuthenticated])
 @api_view(['GET'])
@@ -220,24 +220,24 @@ def search_voice_by_ref(request,voice_id):
         SELECT fv1.voice_id, fv1.file_id, fv1.speaker, fv1.person_id, fv1.time_start, fv1.time_end,  
             1.0 - (fv1.embedding <=> fv2.embedding) AS similarity, 
             fp.full_name, fp.first_name, fp.middle_name, fp.last_name, ff.name AS file_name, ff.file_url
-        FROM fbx_voice fv1
+        FROM mbox_voice fv1
     """
     with connection.cursor() as cursor:
         if last_voice_id == 0:
             query += f"""
-                JOIN fbx_voice fv2 ON (fv1.embedding <=> fv2.embedding) <= (1.0-%s) AND 
+                JOIN mbox_voice fv2 ON (fv1.embedding <=> fv2.embedding) <= (1.0-%s) AND 
                     fv1.file_id <> fv2.file_id
-                JOIN fbx_file ff ON fv1.file_id = ff.file_id
-                LEFT OUTER JOIN fbx_person fp ON fv1.person_id = fp.person_id
+                JOIN mbox_file ff ON fv1.file_id = ff.file_id
+                LEFT OUTER JOIN mbox_person fp ON fv1.person_id = fp.person_id
                 WHERE fv2.voice_id = {voice_id} 
             """
         else:
             query += f"""
-                JOIN fbx_voice fv2 ON (fv1.embedding <=> fv2.embedding)
+                JOIN mbox_voice fv2 ON (fv1.embedding <=> fv2.embedding)
                     BETWEEN (1-{last_similarity}) AND (1.0-%s) AND
                     fv1.file_id <> fv2.file_id 
-                JOIN fbx_file ff ON fv1.file_id = ff.file_id
-                LEFT OUTER JOIN fbx_person fp ON fv1.person_id = fp.person_id
+                JOIN mbox_file ff ON fv1.file_id = ff.file_id
+                LEFT OUTER JOIN mbox_person fp ON fv1.person_id = fp.person_id
                 WHERE fv1.voice_id <> {last_voice_id} AND
                     fv2.voice_id = {voice_id} 
             """
@@ -342,7 +342,7 @@ def get_thumbnail(request, file_id):
         return Response({'error': 'Error parsing thumbnail size.'}, status=500)
 
 
-# Search the fbx_file table for videos #############################################################
+# Search the mbox_file table for videos #############################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -395,7 +395,7 @@ def search_media(request):
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
             fl.attributes, fl.extra_data, fl.status, ts_rank(search_text,to_tsquery('english',%s)) AS rank
-        FROM fbx_file fl, fbx_folder fd
+        FROM mbox_file fl, mbox_folder fd
         WHERE fl.folder_id = fd.folder_id AND 
             fd.path_name LIKE %s AND
             fl.media_type IN ({}) AND 
@@ -412,7 +412,7 @@ def search_media(request):
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
             fl.attributes, fl.extra_data, fl.status, fl.file_id AS rank
-        FROM fbx_file fl, fbx_folder fd
+        FROM mbox_file fl, mbox_folder fd
         WHERE fl.folder_id = fd.folder_id AND 
             fd.path_name LIKE %s AND
             fl.media_type IN ({}) AND 
@@ -443,7 +443,7 @@ def search_media(request):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Get a file from the fbx_file table ###############################################################
+# Get a file from the mbox_file table ###############################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -468,7 +468,7 @@ def get_media(request, file_id):
             f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
             f1.group_name, f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
             f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status
-        FROM fbx_file f1 JOIN fbx_folder f2 ON f1.folder_id = f2.folder_id
+        FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
         WHERE NOT f1.is_deleted AND f1.file_id = %s 
     """
 
@@ -486,7 +486,7 @@ def get_media(request, file_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Get previous or next file from the fbx_file table ################################################
+# Get previous or next file from the mbox_file table ################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -528,7 +528,7 @@ def get_adjacent_media(request, file_id):
         f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, f1.group_name, 
         f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
         f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status
-    FROM fbx_file f1 JOIN fbx_folder f2 ON f1.folder_id = f2.folder_id
+    FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
     WHERE NOT f1.is_deleted AND 
         f1.file_id {symbol} %s AND 
         f1.folder_id = %s AND
@@ -552,7 +552,7 @@ def get_adjacent_media(request, file_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Get a folder from the fbx_folder table ###########################################################
+# Get a folder from the mbox_folder table ###########################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -577,7 +577,7 @@ def get_folder(request, folder_id):
             owner_rights, group_rights, public_rights, subfolder_count, file_count, 
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
             parent_id, remarks, schema_id, extra_data
-        FROM fbx_folder
+        FROM mbox_folder
         WHERE folder_id = %s
     """
 
@@ -595,7 +595,7 @@ def get_folder(request, folder_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
-# Get folders from the fbx_folder table ############################################################
+# Get folders from the mbox_folder table ############################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -620,7 +620,7 @@ def get_folders(request, parent_id):
             owner_rights, group_rights, public_rights, subfolder_count, file_count, 
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
             parent_id, remarks, schema_id, extra_data
-        FROM fbx_folder
+        FROM mbox_folder
     """
     if parent_id > 0:
         query += "WHERE NOT is_deleted AND parent_id = %s"
@@ -656,7 +656,7 @@ def get_file_count(request, folder_id):
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    query = f"SELECT COUNT(*) FROM fbx_file WHERE NOT is_deleted AND folder_id = %s"
+    query = f"SELECT COUNT(*) FROM mbox_file WHERE NOT is_deleted AND folder_id = %s"
     with connection.cursor() as cursor:
         cursor.execute(query, (folder_id,))
         count = cursor.fetchone()[0]
@@ -677,7 +677,7 @@ def get_file_position(request, file_id):
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    query = f"SELECT COUNT(*) FROM fbx_file WHERE NOT is_deleted AND folder_id = {folder_id} AND file_id <= %s"
+    query = f"SELECT COUNT(*) FROM mbox_file WHERE NOT is_deleted AND folder_id = {folder_id} AND file_id <= %s"
     with connection.cursor() as cursor:
         cursor.execute(query, (file_id,))
         position = cursor.fetchone()[0]
@@ -685,7 +685,7 @@ def get_file_position(request, file_id):
     return Response({'result': position}, status=status.HTTP_200_OK)
 
 
-# Update a field of a file in the fbx_file table ###################################################
+# Update a field of a file in the mbox_file table ###################################################
 @csrf_exempt
 @require_http_methods(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -744,7 +744,7 @@ def update_file(request, file_id):
         return JsonResponse({'error': str(e)}, status=400)
 
 
-# Update a field of a person in the fbx_person table ###############################################
+# Update a field of a person in the mbox_person table ###############################################
 @csrf_exempt
 @permission_classes([IsAuthenticated])
 @require_http_methods(['PATCH'])
@@ -824,7 +824,7 @@ def update_transcript_segment(request, file_id):
     oldstr = timeref + '\n' + data['oldstr'].strip() + '\n\n'
     newstr = timeref + '\n' + data['newstr'].strip() + '\n\n'
     query = """
-        UPDATE fbx_file SET webvtt = REPLACE(webvtt,%s,%s)
+        UPDATE mbox_file SET webvtt = REPLACE(webvtt,%s,%s)
         WHERE POSITION(%s IN webvtt) > 0 AND file_id = %s
     """
 
@@ -887,7 +887,7 @@ def get_groups(request):
     return Response({'groups':groups}, status=status.HTTP_200_OK)
 
 
-# Search the fbx_person table ######################################################################
+# Search the mbox_person table ######################################################################
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -917,7 +917,7 @@ def search_person(request):
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name AS file_name, fl.file_url, MIN(ff.time_start), MAX(ff.time_end)
-            FROM fbx_person fp, fbx_face ff, fbx_file fl
+            FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
@@ -934,7 +934,7 @@ def search_person(request):
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name AS file_name, fl.file_url, MIN(ff.time_start), MAX(ff.time_end)
-            FROM fbx_person fp, fbx_face ff, fbx_file fl
+            FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND ff.file_id IN (%s) AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
@@ -971,7 +971,7 @@ def get_transcript(request,file_id):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     labels = ['file_id','webvtt']
-    query = "SELECT file_id, webvtt FROM fbx_file WHERE file_id = %s"
+    query = "SELECT file_id, webvtt FROM mbox_file WHERE file_id = %s"
     
     with connection.cursor() as cursor:
         cursor.execute(query, (file_id,))
@@ -1008,7 +1008,7 @@ def get_audit(request,file_id):
         query = """
             SELECT audit_id, username, activity, event_timestamp, location, table_name, 
                 record_id, old_data, new_data, remarks
-            FROM fbx_audit
+            FROM mbox_audit
             WHERE table_name = %s
             ORDER BY audit_id DESC
             LIMIT %s
@@ -1021,7 +1021,7 @@ def get_audit(request,file_id):
         query = """
             SELECT audit_id, username, activity, event_timestamp, location, table_name,
                 record_id, old_data, new_data, remarks
-            FROM fbx_audit
+            FROM mbox_audit
             WHERE record_id = %s AND table_name = %s
             ORDER BY audit_id DESC
             LIMIT %s
@@ -1064,7 +1064,7 @@ def search_audit(request):
     query = """
         SELECT audit_id, username, activity, event_timestamp, location, table_name, 
             record_id, old_data, new_data, remarks
-        FROM fbx_audit
+        FROM mbox_audit
         WHERE username LIKE %s AND 
             event_timestamp BETWEEN %s AND %s
         ORDER BY audit_id DESC
@@ -1104,7 +1104,7 @@ def get_diary(request,file_id):
     query = """
         SELECT fv.voice_id, fv.file_id, fv.person_id, fv.speaker, fv.time_start, fv.time_end,
             fp.full_name, fp.first_name, fp.middle_name, fp.last_name
-        FROM fbx_voice fv LEFT OUTER JOIN fbx_person fp ON fv.person_id = fp.person_id
+        FROM mbox_voice fv LEFT OUTER JOIN mbox_person fp ON fv.person_id = fp.person_id
         WHERE fv.file_id = %s
         ORDER BY time_start ASC
     """
