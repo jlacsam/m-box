@@ -146,6 +146,11 @@ if not MEDIA_ROOT:
 LOG_DIRECTORY = os.environ.get('MBOX_LOG_DIRECTORY')
 if not LOG_DIRECTORY:
     LOG_DIRECTORY = '/mbox/logs/'
+LOG_SIZE = os.environ.get('MBOX_LOG_SIZE')
+if not LOG_SIZE:
+    LOG_SIZE = 33554432
+else:
+    LOG_SIZE = int(LOG_SIZE)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -199,7 +204,7 @@ REST_USE_JWT = True
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/app/videos/'
 
-XLOGGING = {
+LOGGING = {
        'version': 1,
        'disable_existing_loggers': False,
        'handlers': {
@@ -207,7 +212,7 @@ XLOGGING = {
                'level': 'INFO',
                'class': 'logging.handlers.RotatingFileHandler',
                'filename': LOG_DIRECTORY + 'django.log',
-               'maxBytes': int(os.environ.get('MBOX_LOG_SIZE')),
+               'maxBytes': LOG_SIZE,
                'backupCount': 10,
            },
            'mail_admins': {
