@@ -33,4 +33,8 @@ media/
 # Docker
 *.env
 docker-compose*.yml
+*.tar
+*.tar.gz
 
+# Keras
+*.h5
