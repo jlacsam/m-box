@@ -4,7 +4,6 @@ FROM python:3.10-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV MBOX_LOG_DIRECTORY='/home/jose/Source/MediaBox/logs/'
 
 # Set work directory
 WORKDIR /app
@@ -14,12 +13,19 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    ffmpeg
+    ffmpeg \
+    vim
+
+# set root password
+RUN echo 'root:gn1tlusn0clcj' | chpasswd
 
 # Install dependencies
 COPY requirements.txt /app/
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+
+# Create the log directory
+RUN mkdir -p /mbox/logs
 
 # Copy project files to the container
 COPY . /app/

@@ -8,5 +8,7 @@ services:
       - .env  
     volumes:
       - /home/jose/Source/MediaBox/FaceBox/faces:/mbox/thumbnails  # Mount external file
-    command: gunicorn facebox_api.wsgi:application --bind 0.0.0.0:8000
-
+      - /home/jose/Source/MediaBox/logs:/mbox/logs
+    command: /bin/bash
+    stdin_open: true
+    tty: true

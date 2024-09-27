@@ -881,8 +881,10 @@ def get_groups(request):
     for i, group in enumerate(groups):
         if group.name == settings.MBOX_SUPERVISORS_GROUP:
             groups[i] = 'Supervisors'
-        if group.name == settings.MBOX_EDITORS_GROUP:
+        elif group.name == settings.MBOX_EDITORS_GROUP:
             groups[i] = 'Editors'
+        else:
+            groups[i] = group.name.title()
 
     return Response({'groups':groups}, status=status.HTTP_200_OK)
 

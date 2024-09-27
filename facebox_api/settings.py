@@ -23,17 +23,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-%24cuv(*k_gh2%3$s-x$mr6c^)%r$#nun-u1gnp_=@$#b@hnu2'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('MBOX_DEBUG')
+DEBUG = os.environ.get('MBOX_DEBUG','True').lower() == 'true'
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+ALLOWED_HOSTS = ['localhost','127.0.0.1']
 if not DEBUG:
     allowed_hosts = os.environ.get('MBOX_ALLOWED_HOSTS')
-    ALLOWED_HOSTS = []
     if allowed_hosts:
         ALLOWED_HOSTS = [token.strip() for token in allowed_hosts.split(',')]
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS in production
+    SECURE_SSL_REDIRECT = True # Redirect HTTP to HTTPS in production
     SESSION_COOKIE_SECURE = True  # Use secure cookies
     CSRF_COOKIE_SECURE = True  # Use secure CSRF cookies
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
@@ -174,11 +175,11 @@ REST_FRAMEWORK = {
 
 # Configure django-auth-adfs
 AUTH_ADFS = {
-    'CLIENT_ID': os.environ.get('AZURE_CLIENT_ID'),        # 'b210533f-da48-4eeb-97ee-2d5328913a1b',
-    'RELYING_PARTY_ID': os.environ.get('AZURE_CLIENT_ID'), # 'b210533f-da48-4eeb-97ee-2d5328913a1b',
-    'AUDIENCE': os.environ.get('AZURE_CLIENT_ID'),         # 'b210533f-da48-4eeb-97ee-2d5328913a1b',
-    'TENANT_ID': os.environ.get('AZURE_TENANT_ID'),        # '208bb8cb-5f6d-413d-aeec-6be0ce6ad6a5',
-    'CLIENT_SECRET': os.environ.get('AZURE_CLIENT_SECRET'),# 'J2p8Q~LkWuOSNf4VADvQp2AtzlPQEWTuXaiWIa1S',
+    'CLIENT_ID': os.environ.get('AZURE_CLIENT_ID'),
+    'RELYING_PARTY_ID': os.environ.get('AZURE_CLIENT_ID'),
+    'AUDIENCE': os.environ.get('AZURE_CLIENT_ID'),
+    'TENANT_ID': os.environ.get('AZURE_TENANT_ID'),
+    'CLIENT_SECRET': os.environ.get('AZURE_CLIENT_SECRET'),
     'CLAIM_MAPPING': {
         'first_name': 'given_name',
         'last_name': 'family_name',
@@ -196,8 +197,8 @@ AUTH_ADFS = {
     ],
 }
 
-AZURE_CONNECTION_STRING = os.environ.get('AZURE_CONNECTION_STRING') # 'DefaultEndpointsProtocol=https;AccountName=ayalamedialib;AccountKey=XFv/79FwVeooejIfcHWZ/eI6U3DKtcKZ2ZDb8zwnkcSZgFBJnIz3K0LJvdCKYOGETaZHJ1BZ8zwN+ASt9PPZuQ==;EndpointSuffix=core.windows.net'
-MBOX_EDITORS_GROUP = os.environ.get('MBOX_EDITORS_GROUP')  #'20a6b3e3-fe60-4c00-a09d-2061dab62dd9'
+AZURE_CONNECTION_STRING = os.environ.get('AZURE_CONNECTION_STRING')
+MBOX_EDITORS_GROUP = os.environ.get('MBOX_EDITORS_GROUP')
 MBOX_SUPERVISORS_GROUP = os.environ.get('MBOX_SUPERVISORS_GROUP')
 REST_USE_JWT = True
 
