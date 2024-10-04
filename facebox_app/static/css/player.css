@@ -728,7 +728,7 @@ tr.highlighted {
 .folder-browser-visible {
     position: fixed;
     display: flex;
-    width: 130px;
+    width: 160px;
     z-index: 1002;
     background-color: white;
     color: black;

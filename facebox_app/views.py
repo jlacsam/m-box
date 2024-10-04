@@ -277,20 +277,39 @@ def get_face_image(request, face_id):
     try:
         # Query the database
         face = FbxFace.objects.get(face_id=face_id)
-        file_path = os.path.join(settings.MEDIA_ROOT, str(face))
+        thumbnails = FbxThumbnail.objects.get(thumbnail_id=face.thumbnail_id)
+        file_path = thumbnails.path
+ 
+        with open(thumbnails.path, 'rb') as f:
+            f.seek(face.thumbnail_offset)
+            temp = f.read(4)
+            thumbnail_size = struct.unpack('<I', temp)[0]
+            print(f"Reading {thumbnail_size} bytes from {thumbnails.path} starting {face.thumbnail_offset+4} for face_id={face_id}")
+            f.seek(face.thumbnail_offset + 4)  # Skip the size bytes
+            jpeg_thumbnail = f.read(thumbnail_size)
+            
+            # Validate JPEG data
+            if jpeg_thumbnail[:2] != b'\xFF\xD8' or jpeg_thumbnail[-2:] != b'\xFF\xD9':
+                return Response({'error': 'Invalid JPEG data'}, status=400)
+            
+            # Create a file-like object from the bytes
+            jpeg_io = io.BytesIO(jpeg_thumbnail)
+            
+            # Use HttpResponse instead of FileResponse
+            response = HttpResponse(jpeg_io, content_type='image/jpeg')
+            response['Content-Disposition'] = f'inline; filename="face_{face_id}.jpg"'
+            return response
 
-        # Check if the file exists
-        if not os.path.exists(file_path):
-            file_path = os.path.join(settings.MEDIA_ROOT, face.thumbnail())
-            if not os.path.exists(file_path):
-                print(f"{file_path} not found.")
-                return Response({'error': 'File not found'}, status=404)
-
-        # Send the file as a response
-        return FileResponse(open(file_path, 'rb'), content_type='image/jpeg')
-
-    except FbxFace.DoesNotExist:
-        return Response({'error': 'Face not found'}, status=404)
+    except FbxFile.DoesNotExist:
+        return Response({'error': 'File not found.'}, status=404)
+    except FbxThumbnail.DoesNotExist:
+        return Response({'error': 'Thumbnail not found.'}, status=404)
+    except IOError:
+        return Response({'error': 'Error reading thumbnail file.'}, status=500)
+    except struct.error:
+        return Response({'error': 'Error parsing thumbnail size.'}, status=500)
+    except Exception as e:
+        print(e)
 
 
 # Get a jpeg thumbnail for a file ##################################################################

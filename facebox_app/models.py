@@ -40,6 +40,8 @@ class FbxFace(models.Model):
     confidence = models.FloatField()
     embedding = models.TextField(blank=True, null=True)  # This field type is a guess.
     merged_to = models.BigIntegerField(blank=True, null=True)
+    thumbnail_id = models.IntegerField(blank=True, null=True)
+    thumbnail_offset = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False

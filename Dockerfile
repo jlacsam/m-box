@@ -14,18 +14,24 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     ffmpeg \
-    vim
+    vim \
+    openssh-server \
+    passwd
 
 # set root password
 RUN echo 'root:gn1tlusn0clcj' | chpasswd
+
+# Lock the container to require login for root
+RUN sed -i 's/^root:!:/root:*:/' /etc/shadow
 
 # Install dependencies
 COPY requirements.txt /app/
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Create the log directory
+# Create the log and thumbnails directory
 RUN mkdir -p /mbox/logs
+RUN mkdir -p /mbox/thumbnails
 
 # Copy project files to the container
 COPY . /app/
