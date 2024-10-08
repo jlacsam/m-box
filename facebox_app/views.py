@@ -93,6 +93,7 @@ def search_face(request):
             ORDER BY similarity DESC
             LIMIT %s
         """
+
         cursor.execute(query, (embedding.tolist(),embedding.tolist(),similarity,max_rows))
         rows = cursor.fetchall()
 
@@ -279,8 +280,13 @@ def get_face_image(request, face_id):
         face = FbxFace.objects.get(face_id=face_id)
         thumbnails = FbxThumbnail.objects.get(thumbnail_id=face.thumbnail_id)
         file_path = thumbnails.path
+
+        if os.path.exists(thumbnails.path):
+            file_path = thumbnails.path
+        else:
+            file_path = os.path.join(settings.MEDIA_ROOT,thumbnails.path)
  
-        with open(thumbnails.path, 'rb') as f:
+        with open(file_path, 'rb') as f:
             f.seek(face.thumbnail_offset)
             temp = f.read(4)
             thumbnail_size = struct.unpack('<I', temp)[0]
@@ -331,7 +337,16 @@ def get_thumbnail(request, file_id):
         thumbnails = FbxThumbnail.objects.get(thumbnail_id=file.thumbnail_id)
         file_path = thumbnails.path
 
-        with open(thumbnails.path, 'rb') as f:
+        if os.path.exists(thumbnails.path):
+            file_path = thumbnails.path
+        else:
+            file_path = os.path.join(settings.MEDIA_ROOT,thumbnails.path)
+
+        if not os.path.exists(file_path):
+            print(f"{thumbnails.path} not found.")
+            print(f"{file_path} not found.")
+ 
+        with open(file_path, 'rb') as f:
             f.seek(file.thumbnail_offset)
             temp = f.read(4)
             thumbnail_size = struct.unpack('<I', temp)[0]

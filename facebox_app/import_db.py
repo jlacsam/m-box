@@ -2,6 +2,7 @@ import sys
 import json
 import psycopg2
 import configparser
+from psycopg2.extras import Json
 
 def get_db_config(filename='params.cfg', section='postgresql'):
     # Create a parser
@@ -20,12 +21,20 @@ def get_db_config(filename='params.cfg', section='postgresql'):
 
     return db_params
 
+
+def adapt_dict(data):
+    if isinstance(data, dict):
+        return Json(data)
+    return data
+
+
 def insert_folder(cursor, folder_data, parent_id=None):
     folder_data = folder_data.copy()
     subfolders = folder_data.pop('subfolders', [])
     files = folder_data.pop('files', [])
     folder_data.pop('folder_id', None)  # Remove folder_id as it will be auto-generated
     folder_data['parent_id'] = parent_id
+    folder_data = {k: adapt_dict(v) for k, v in folder_data.items()}
 
     columns = ', '.join(folder_data.keys())
     values = ', '.join(['%s'] * len(folder_data))
@@ -44,6 +53,9 @@ def insert_folder(cursor, folder_data, parent_id=None):
     for file in files:
         insert_file(cursor, file, new_folder_id)
 
+    return nnew_folder_id
+
+
 def insert_file(cursor, file_data, folder_id):
     file_data = file_data.copy()
     faces = file_data.pop('faces', [])
@@ -51,6 +63,7 @@ def insert_file(cursor, file_data, folder_id):
     file_data.pop('file_id', None)  # Remove file_id as it will be auto-generated
     file_data.pop('search_text', None) # Remove search_text as it will also be auto-generated
     file_data['folder_id'] = folder_id
+    file_data = {k: adapt_dict(v) for k, v in file_data.items()}
 
     columns = ', '.join(file_data.keys())
     values = ', '.join(['%s'] * len(file_data))
@@ -72,7 +85,9 @@ def insert_file(cursor, file_data, folder_id):
 def insert_face(cursor, face_data, file_id):
     face_data = face_data.copy()
     face_data.pop('face_id', None)  # Remove face_id as it will be auto-generated
+    face_data.pop('person_id', None)  # Remove person_id as it will be auto-generated
     face_data['file_id'] = file_id
+    face_data = {k: adapt_dict(v) for k, v in face_data.items()}
 
     columns = ', '.join(face_data.keys())
     values = ', '.join(['%s'] * len(face_data))
@@ -85,7 +100,9 @@ def insert_face(cursor, face_data, file_id):
 def insert_voice(cursor, voice_data, file_id):
     voice_data = voice_data.copy()
     voice_data.pop('voice_id', None)  # Remove voice_id as it will be auto-generated
+    voice_data.pop('person_id', None)  # Remove person_id as it will be auto-generated
     voice_data['file_id'] = file_id
+    voice_data = {k: adapt_dict(v) for k, v in voice_data.items()}
 
     columns = ', '.join(voice_data.keys())
     values = ', '.join(['%s'] * len(voice_data))
@@ -95,34 +112,97 @@ def insert_voice(cursor, voice_data, file_id):
         VALUES ({values})
     """, list(voice_data.values()))
 
-def import_from_json(conn, input_file, parent_id):
-    with open(input_file, 'r') as f:
-        data = json.load(f)
 
-    cursor = conn.cursor()
+def configure_thumbnails(cursor, bucket_name, folder_name, folder_id, thumbs_dat, faces_dat):
+    # Get the media root
+    media_root = os.environ.get('MBOX_MEDIA_ROOT')
+    if not media_root:
+        media_root = '/mbox/thumbnails/'
 
-    try:
-        insert_folder(cursor, data, parent_id)
-        conn.commit()
-        print(f"Data imported successfully from {input_file}")
-    except Exception as e:
-        conn.rollback()
-        print(f"An error occurred: {e}")
-    finally:
-        cursor.close()
-        conn.close()
+    # Create record for file thumbnails
+    label = f"thumbs__{bucket_name}__{folder_name}"
+    thumbs_path = media_root + label + ".dat"
+    cursor.execute("""
+        INSERT INTO mbox_thumbnail(path,label) VALUES (%s, %s)
+        RETURNING thumbnail_id
+    """, (thumbs_path, label))
+    thumbnail_id = cursor.fetchone()[0]
+
+    # Link the files to the thumbnail record
+    cursor.execute("""
+        UPDATE mbox_file SET thumbnail_id = %s WHERE folder_id = %s
+    """, (thumbnail_id, folder_id))
+
+    # Create record for the face thumbnails
+    label = f"faces__{bucket_name}__{folder_name}"
+    faces_path = media_root + label + ".dat"
+    cursor.execute("""
+        INSERT INTO mbox_thumbnail(path,label) VALUES (%s, %s)
+        RETURNING thumbnail_id
+    """, (faces_path, label))
+    thumbnail_id = cursor.fetchone()[0]
+
+    # Link the faces to the thumbnail record
+    cursor.execute("""
+        UPDATE mbox_face SET thumbnail_id = %s
+        WHERE file_id IN (SELECT file_id FROM mbox_file WHERE folder_id = %s)
+    """, (thumbnail_id, folder_id))
+
+    # Move the dat files to the configured directory
+    if not thumbs_dat == thumbs_path:
+        os.rename(thumbs_dat, thumbs_path)
+    if not faces_dat == faces_path:
+        os.rename(faces_dat, faces_path)
+
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Usage: python {sys.argv[0]} <parent_id> <input_json>")
+    if len(sys.argv) != 5:
+        print(f"Usage: python {sys.argv[0]} <parent_id> <input_json> <thumbs dat> <faces dat>")
         print("This program will import the folders, files, faces and voices into the database.")
         print("<parent_id> is the folder_id of where to attach the folder tree.")
+        print("<input_json> is the output of export_db.py, its filename must be <bucket>__<folder>.json")
+        print("<thumbs_dat> is the dat file containing the file thumbnails.")
+        print("<faces_dat> is the dat file containing the faces thumbnails.")
         sys.exit(1)
 
     parent_id = sys.argv[1]
     input_file = sys.argv[2]
-    params = get_db_config()
-    conn = psycopg2.connect(**params)
+    thumbs_dat = sys.argv[3]
+    faces_dat = sys.argv[4]
 
-    import_from_json(conn, input_file, parent_id)
+    # Check if the files exist
+    if not os.path.exists(input_file):
+        print(f"{input_file} not found.")
+        sys.exit(1)
+
+    if not os.path.exists(thumbs_dat):
+        print(f"{thumbs_dat} not found.")
+        sys.exit(1)
+
+    if not os.path.exists(faces_dat):
+        print(f"{faces_dat} not found.")
+        sys.exit(1)
+
+    params = get_db_config()
+
+    conn = psycopg2.connect(**params)
+    if conn is None:
+        print("Unable to connect to the database.")
+        sys.exit(1)
+
+    cursor = conn.cursor()
+
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    new_folder_id = insert_folder(cursor, data, parent_id)
+    print(f"Data imported successfully from {input_file}")
+
+    filename = os.path.splitext(os.path.basename(input_file))[0]
+    bucket_name, folder_name, temp = filename.split('__')
+    configure_thumbnails(cursor, bucket_name, folder_name, new_folder_id, thumbs_dat, faces_dat)
+
+    cursor.close()
+    conn.commit()
+    conn.close()
 
