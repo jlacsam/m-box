@@ -84,6 +84,7 @@ def validate_subscription(subscription_id, client_secret):
 
 def tuples_to_json(tuples,labels):
     if len(labels) != len(tuples[0]):
+        print("Unequal labels and tuples!",labels,"\n",tuples[0])
         raise ValueError("Number of labels must match the number of elements in a tuple.")
 
     dict_list = []

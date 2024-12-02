@@ -114,25 +114,11 @@ def insert_voice(cursor, voice_data, file_id):
     """, list(voice_data.values()))
 
 
-def configure_thumbnails(cursor, bucket_name, folder_name, folder_id, thumbs_dat, faces_dat):
+def configure_thumbnails(cursor, bucket_name, folder_name, folder_id, faces_dat):
     # Get the media root
     media_root = os.environ.get('MBOX_MEDIA_ROOT')
     if not media_root:
         media_root = '/mbox/thumbnails/'
-
-    # Create record for file thumbnails
-    label = f"{bucket_name}__{folder_name}__thumbs"
-    thumbs_path = media_root + label + ".dat"
-    cursor.execute("""
-        INSERT INTO mbox_thumbnail(path,label) VALUES (%s, %s)
-        RETURNING thumbnail_id
-    """, (thumbs_path, label))
-    thumbnail_id = cursor.fetchone()[0]
-
-    # Link the files to the thumbnail record
-    cursor.execute("""
-        UPDATE mbox_file SET thumbnail_id = %s WHERE folder_id = %s
-    """, (thumbnail_id, folder_id))
 
     # Create record for the face thumbnails
     label = f"{bucket_name}__{folder_name}__faces"
@@ -151,27 +137,21 @@ def configure_thumbnails(cursor, bucket_name, folder_name, folder_id, thumbs_dat
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print(f"Usage: python {sys.argv[0]} <parent_id> <input_json> <thumbs dat> <faces dat>")
+    if len(sys.argv) != 4:
+        print(f"Usage: python {sys.argv[0]} <parent_id> <input_json> <faces dat>")
         print("This program will import the folders, files, faces and voices into the database.")
         print("<parent_id> is the folder_id of where to attach the folder tree.")
         print("<input_json> is the output of export_db.py, its filename must be <bucket>__<folder>.json")
-        print("<thumbs_dat> is the dat file containing the file thumbnails.")
         print("<faces_dat> is the dat file containing the faces thumbnails.")
         sys.exit(1)
 
     parent_id = sys.argv[1]
     input_file = sys.argv[2]
-    thumbs_dat = sys.argv[3]
-    faces_dat = sys.argv[4]
+    faces_dat = sys.argv[3]
 
     # Check if the files exist
     if not os.path.exists(input_file):
         print(f"{input_file} not found.")
-        sys.exit(1)
-
-    if not os.path.exists(thumbs_dat):
-        print(f"{thumbs_dat} not found.")
         sys.exit(1)
 
     if not os.path.exists(faces_dat):
@@ -195,7 +175,7 @@ if __name__ == "__main__":
 
     filename = os.path.splitext(os.path.basename(input_file))[0]
     bucket_name, folder_name = filename.split('__')
-    configure_thumbnails(cursor, bucket_name, folder_name, new_folder_id, thumbs_dat, faces_dat)
+    configure_thumbnails(cursor, bucket_name, folder_name, new_folder_id, faces_dat)
 
     cursor.close()
     conn.commit()

@@ -92,6 +92,16 @@ class FbxFile(models.Model):
     thumbnail_id = models.IntegerField(blank=True, null=True)
     thumbnail_offset = models.IntegerField(blank=True, null=True)
     status = models.CharField(max_length=20, blank=True, null=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    creator = models.CharField(max_length=255, blank=True, null=True)
+    subject = models.CharField(max_length=255, blank=True, null=True)
+    publisher = models.CharField(max_length=255, blank=True, null=True)
+    contributor = models.CharField(max_length=255, blank=True, null=True)
+    identifier = models.CharField(max_length=255, blank=True, null=True)
+    language = models.CharField(max_length=255, blank=True, null=True)
+    relation = models.CharField(max_length=255, blank=True, null=True)
+    coverage = models.CharField(max_length=255, blank=True, null=True)
+    rights = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False

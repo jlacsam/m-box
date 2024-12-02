@@ -1,0 +1,6 @@
+curl -X GET http://localhost:8000/api/get-groups/ \
+-H "Content-Type: application/json" \
+-H "Subscription-ID: 00000000" \
+-H "Client-Secret: 00000000" \
+-H "X-CSRFToken: ENG56ZE5UVHAIY9UEx66jWiDb2vgLqNz"
+

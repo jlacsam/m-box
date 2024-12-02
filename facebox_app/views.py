@@ -19,6 +19,7 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, FileResponse, HttpResponse, StreamingHttpResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 
 from azure.storage.blob import BlobServiceClient
 
@@ -420,7 +421,8 @@ def search_media(request):
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'public_rights', 'ip_location', 'remarks', 'version', 
-        'attributes', 'extra_data', 'file_status', 'rank'];
+        'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'rank'];
 
     if len(pattern) > 0:
         query = """
@@ -428,7 +430,9 @@ def search_media(request):
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
-            fl.attributes, fl.extra_data, fl.status, ts_rank(search_text,to_tsquery('english',%s)) AS rank
+            fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
+            ts_rank(search_text,to_tsquery('english',%s)) AS rank
         FROM mbox_file fl, mbox_folder fd
         WHERE fl.folder_id = fd.folder_id AND 
             fd.path_name LIKE %s AND
@@ -445,7 +449,9 @@ def search_media(request):
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
-            fl.attributes, fl.extra_data, fl.status, fl.file_id AS rank
+            fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
+            fl.file_id AS rank
         FROM mbox_file fl, mbox_folder fd
         WHERE fl.folder_id = fd.folder_id AND 
             fd.path_name LIKE %s AND
@@ -494,14 +500,16 @@ def get_media(request, file_id):
         'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 
         'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
         'group_name', 'owner_rights', 'group_rights', 'public_rights', 'ip_location',
-        'remarks', 'version', 'attributes', 'extra_data', 'file_status'];
+        'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 
+        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
     rows = []
     query = """
         SELECT f1.file_id, f1.folder_id, f1.name, f2.path_name, f1.extension, f1.media_source, f1.size, 
             f1.file_url, f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, 
             f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
             f1.group_name, f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
-            f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status
+            f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
+            f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
         FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
         WHERE NOT f1.is_deleted AND f1.file_id = %s 
     """
@@ -512,6 +520,9 @@ def get_media(request, file_id):
 
     # Close database connection
     cursor.close()
+
+    # Update the last_accessed field 
+    update_last_accessed(file_id)
 
     # Serialize the results and return the response
     if len(rows):
@@ -541,7 +552,8 @@ def get_adjacent_media(request, file_id):
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 'texts', 
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'public_rights', 'ip_location',
-        'remarks', 'version', 'attributes', 'extra_data', 'file_status'];
+        'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject',
+        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
     rows = []
 
     symbol = '<' 
@@ -561,7 +573,8 @@ def get_adjacent_media(request, file_id):
         f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, f1.places, f1.texts, 
         f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, f1.group_name, 
         f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
-        f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status
+        f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
+            f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
     FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
     WHERE NOT f1.is_deleted AND 
         f1.file_id {symbol} %s AND 
@@ -763,8 +776,9 @@ def update_file(request, file_id):
 
         if updated_fields:
             row.save(update_fields=updated_fields)
-            # Insert audit record
-            insert_audit(request.user.username,'UPDATE','mbx_file',file_id,old_data,new_data,get_client_ip(request))
+            # Insert audit record, update last_modified
+            insert_audit(request.user.username,'UPDATE','mbox_file',file_id,old_data,new_data,get_client_ip(request))
+            update_last_modified(file_id)
             return JsonResponse({
                 'message': f'Metadata updated for file {file_id}',
                 'update_fields': updated_fields
@@ -822,7 +836,7 @@ def update_person(request, person_id):
         if updated_fields:
             row.save(update_fields=updated_fields)
             # Insert audit record
-            insert_audit(request.user.username,'UPDATE','mbx_person',person_id,old_data,new_data,get_client_ip(request))
+            insert_audit(request.user.username,'UPDATE','mbox_person',person_id,old_data,new_data,get_client_ip(request))
             return JsonResponse({
                 'message': f'Fields updated for person {person_id}',
                 'update_fields': updated_fields
@@ -867,11 +881,95 @@ def update_transcript_segment(request, file_id):
         count = cursor.rowcount
         old_data = {'webvtt-cue':oldstr}
         new_data = {'webvtt-cue':newstr}
-        insert_audit(request.user.username,'UPDATE','mbx_file',file_id,old_data,new_data,get_client_ip(request))
+        insert_audit(request.user.username,'UPDATE','mbox_file',file_id,old_data,new_data,get_client_ip(request))
 
-    # Commit then close the cursor
-    connection.commit()
-    cursor.close()
+    # Return the number of rows affected
+    return JsonResponse({'rowcount':count}, status=status.HTTP_200_OK)
+
+
+# Merge two or more persons together ###############################################################
+@csrf_exempt
+@require_http_methods(['PATCH'])
+def merge_persons(request, person_id):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return JsonResponse({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Check if user is a member of the editors group
+    groups = request.user.groups.all()
+    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
+        return JsonResponse({'error': 'User is not allowed to perform database updates.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    persons_list = json.loads(request.body)
+    if not isinstance(persons_list, list) or not all(isinstance(i, int) for i in persons_list):
+        return JsonResponse({"error": "Invalid input. Expected a list of integers."}, status=status.HTTP_400_BAD_REQUEST)    
+    placeholders = ', '.join(['%s'] * len(persons_list))
+
+    # Link the faces from the other persons to the identified person
+    query = f"""
+        UPDATE mbox_face SET person_id = %s
+        WHERE person_id IN ({placeholders})
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, (person_id, *persons_list))
+        count = cursor.rowcount
+
+    # De-associate the other persons from the file
+    query = f"""
+        UPDATE mbox_person SET file_id = NULL
+        WHERE person_id IN ({placeholders})
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (*persons_list,))
+        count = cursor.rowcount
+
+    old_data = {'person_id':person_id}
+    new_data = {'persons_list':persons_list}
+    insert_audit(request.user.username,'UPDATE','mbox_face',person_id,old_data,new_data,get_client_ip(request))
+
+    # Return the number of rows affected
+    return JsonResponse({'rowcount':count}, status=status.HTTP_200_OK)
+
+
+# Unlink two or more faces from a person ###########################################################
+@csrf_exempt
+@require_http_methods(['PATCH'])
+def unlink_faces(request, person_id):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return JsonResponse({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Check if user is a member of the editors group
+    groups = request.user.groups.all()
+    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
+        return JsonResponse({'error': 'User is not allowed to perform database updates.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        faces_list = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON input."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not isinstance(faces_list, list) or not all(isinstance(i, int) for i in faces_list):
+        return JsonResponse({"error": "Invalid input. Expected a list of integers."}, status=status.HTTP_400_BAD_REQUEST)  
+    placeholders = ', '.join(['%s'] * len(faces_list))
+    query = f"""
+        UPDATE mbox_face SET person_id = NULL
+        WHERE person_id = %s AND face_id IN ({placeholders})
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, (person_id, *faces_list,))
+        count = cursor.rowcount
+        old_data = {'person_id':person_id}
+        new_data = {'faces_list':faces_list}
+        insert_audit(request.user.username,'UPDATE','mbox_face',person_id,old_data,new_data,get_client_ip(request))
 
     # Return the number of rows affected
     return JsonResponse({'rowcount':count}, status=status.HTTP_200_OK)
@@ -1282,6 +1380,7 @@ def reports_viewer(request):
     }
     return render(request, 'reports.html', context)
 
+# Helper functions #################################################################################
 # Insert audit record ##############################################################################
 def insert_audit(username,activity,table_name,record_id,old_data,new_data,location):
     try:
@@ -1299,6 +1398,21 @@ def insert_audit(username,activity,table_name,record_id,old_data,new_data,locati
     except Exception as e:
         print(f"Error occurred: {e}")
 
+def update_last_accessed(file_id):
+    try:
+        row = get_object_or_404(FbxFile, file_id=file_id)
+        row.last_accessed = timezone.now() 
+        row.save()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+def update_last_modified(file_id):
+    try:
+        row = get_object_or_404(FbxFile, file_id=file_id)
+        row.last_modified = timezone.now()
+        row.save()
+    except Exception as e:
+        print(f"Error occurred: {e}")
 
 ####################################################################################################
 # The following are for handling streaming the audio fro Azure Blob Storage. #######################

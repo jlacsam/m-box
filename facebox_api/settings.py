@@ -27,14 +27,19 @@ DEBUG = os.environ.get('MBOX_DEBUG','True').lower() == 'true'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 ALLOWED_HOSTS = ['localhost','127.0.0.1']
+allowed_hosts = os.environ.get('MBOX_ALLOWED_HOSTS')
+if allowed_hosts:
+    ALLOWED_HOSTS = [token.strip() for token in allowed_hosts.split(',')]
+
 if not DEBUG:
-    allowed_hosts = os.environ.get('MBOX_ALLOWED_HOSTS')
-    if allowed_hosts:
-        ALLOWED_HOSTS = [token.strip() for token in allowed_hosts.split(',')]
     SECURE_SSL_REDIRECT = True # Redirect HTTP to HTTPS in production
     SESSION_COOKIE_SECURE = True  # Use secure cookies
     CSRF_COOKIE_SECURE = True  # Use secure CSRF cookies
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Using Elastic IP in AWS needs this. Otherwise, a cross-origin error is thrown
+CSRF_TRUSTED_ORIGINS = ['https://'+token for token in allowed_hosts.split(',')]
+CSRF_TRUSTED_ORIGINS.extend(['http://127.0.0.1:8000','http://localhost:8000'])
 
 # Application definition
 

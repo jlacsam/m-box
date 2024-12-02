@@ -1,0 +1,7 @@
+curl -X PATCH -b "sessionid=q2943v49o1mk6jttkgywbsbbyj248k07" http://localhost:8000/api/unlink-faces/810/ \
+-H "Content-Type: application/json" \
+-H "Subscription-ID: 00000000" \
+-H "Client-Secret: 00000000" \
+-H "X-CSRFToken: ENG56ZE5UVHAIY9UEx66jWiDb2vgLqNz" \
+-d '[667,668]'
+

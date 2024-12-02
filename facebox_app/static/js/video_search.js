@@ -160,9 +160,9 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
 function updatePlaceholder() {
     const searchBox = document.getElementById('search-box');
     if (currentFolder == '/') {
-        searchBox.placeholder = "[Search audios in all folders]";
+        searchBox.placeholder = "[Search videos in all folders]";
     } else {
-        searchBox.placeholder = `[Search audios in ${currentFolder}]`;
+        searchBox.placeholder = `[Search videos in ${currentFolder}]`;
     }
 }
 
@@ -199,6 +199,7 @@ function searchVideos(pattern = '', scope = '/') {
             displayResults(data.results);
             highlightWords(dequote(pattern));
             updatePagination(data.results);
+            displayThumbnails(data.results);
         }
     })
     .catch(error => {
@@ -212,12 +213,12 @@ function displayResults(results) {
     resultsBody.innerHTML = '';
 
     if (results == null) {
-        resultsBody.innerHTML = '<tr><td colspan="20">API call returned null.</td></tr>';
+        resultsBody.innerHTML = '<tr><td colspan="21">API call returned null.</td></tr>';
         return;
     }
 
     if (results.length === 0) {
-        resultsBody.innerHTML = '<tr><td colspan="20">No matching records found.</td></tr>';
+        resultsBody.innerHTML = '<tr><td colspan="21">No matching records found.</td></tr>';
         return;
     }
 
@@ -256,6 +257,7 @@ function displayResults(results) {
 
         let html = `
             <td>${item.file_id}</td>
+            <td><img class="thumbnail" id="thumbnail_${item.file_id}" src="" alt="thumbnail"></td>
             <td><a href="${item.file_url}" class="hyperlink" target="_blank">${item.file_name}</a><br><br>
                 <a href="#" onclick="goToFaces(${item.file_id},'${item.file_name}')">Faces</a>&nbsp;
                 <a href="#" onclick="goToVoices(${item.file_id},'${item.file_name}')">Voices</a></td>
@@ -287,6 +289,43 @@ function displayResults(results) {
 
         row.innerHTML = html;
         resultsBody.appendChild(row);
+    });
+}
+
+function displayThumbnails(results) {
+    const csrftoken = getCookie('csrftoken');
+    results.forEach(item => {
+        fetch(`/api/get-thumbnail/${item.file_id}/`, {
+            method: 'GET',
+            headers: {
+                'Subscription-ID': SUBSCRIPTION_ID,
+                'Client-Secret': CLIENT_SECRET,
+                'X-CSRFToken': csrftoken,
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.blob(); // Get the image data as a blob
+        })
+        .then(blob => {
+            isValidJPEG(blob).then(isValid => {
+                if (isValid) {
+                    // Create a URL for the blob and display it as an image
+                    const imageUrl = URL.createObjectURL(blob);
+                    const imageObj = document.getElementById('thumbnail_' + item.file_id);
+                    imageObj.src = imageUrl;
+                } else {
+                    console.error('Invalid JPEG file');
+                }
+            });
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+            document.getElementById('imageDisplay').innerHTML = '<p>Error loading image</p>';
+        });
+
     });
 }
 
@@ -502,3 +541,25 @@ function setMaxRows(value) {
         }
     });
 }
+
+function getFileCount(folder_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-file-count/${folder_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Media-Type' : 'video',
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        totalFiles = data.result;
+        document.getElementById('detail-file-count').innerHTML = data.result + ' files)';
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
