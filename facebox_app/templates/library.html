@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>m.box Reports</title>
+    <title>m.box Library</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
+    <link rel="stylesheet" href="{% static 'css/library.css' %}">
     <link rel="icon" href="{% static 'favicon.ico' %}">
 </head>
 <body>
@@ -19,8 +19,8 @@
                 <td id="faces-tab" onclick="goToFaces()">Faces</td>
                 <td id="voices-tab" onclick="goToVoices()">Voices</td>
                 <td id="menu-separator">&nbsp;</td>
-                <td id="library-tab" onclick="goToLibrary()">Library</td>
-                <td id="reports-tab">Reports</td>
+                <td id="library-tab">Library</td>
+                <td id="reports-tab" onclick="goToReports()">Reports</td>
                 </tr></table></td>
             <td id="filler-space"></td>
             <td><table id="tool-bar"><tr>
@@ -44,9 +44,8 @@
             <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
         </ul>
     </div>
-    <div id="reports-menu">
-        <span id="audit-records" class="report-item" onclick="showAudit()">Audit records</span>
-        <span id="folder-counts" class="report-item" onclick="showFolders(1)">Folder counts</span>
+    <div id="search-bar">
+        <input id="search-box" type="search" class="search" placeholder="[Search assets]">
     </div>
     <div id="container">
         <div id="results-div" class="results-div">
@@ -57,6 +56,6 @@
         const q_is_supervisor = ('{{ is_supervisor }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
-    <script src="{% static 'js/reports.js' %}"></script>
+    <script src="{% static 'js/library.js' %}"></script>
 </body>
 </html>

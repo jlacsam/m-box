@@ -108,6 +108,72 @@ def search_face(request):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
+# Get the faces linked to the given person #####################################
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_linked_faces(request,person_id):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+    max_rows = request.headers.get('Max-Rows')
+    start_from = request.headers.get('Start-From')
+   
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Process start from
+    last_face_id = 0
+    if start_from is not None:
+        json_start_from = json.loads(start_from)
+        last_face_id = json_start_from['face_id']
+
+    # Get the embedding associated with the face
+    query = """
+        SELECT f.embedding 
+        FROM mbox_person p JOIN mbox_face f ON p.face_id = f.face_id
+        WHERE p.person_id = %s
+    """
+
+    cursor = connection.cursor()
+    cursor.execute(query, (person_id,))
+    row = cursor.fetchone()
+    if row is None:
+        return Response({'error':f'Invalid person_id: {person_id}, or no faces linked.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    embedding = json.loads(row[0])
+
+    # Search for matching records in the database
+    labels = ['face_id','file_id','person_id','time_start','time_end','box','confidence',
+        'merged_to','similarity','full_name','first_name','middle_name','last_name','file_name','file_url']
+    rows = []
+    query = """
+        SELECT ff.face_id, ff.file_id, ff.person_id, ff.time_start, ff.time_end, ff.box, 
+            ff.confidence, ff.merged_to, 1.0 - (embedding <=> %s::vector) AS similarity, 
+            fp.full_name, fp.first_name, fp.middle_name, fp.last_name, fl.name AS file_name, fl.file_url
+        FROM mbox_face ff, mbox_person fp, mbox_file fl
+        WHERE fp.person_id = %s AND
+            ff.person_id = fp.person_id AND 
+            ff.file_id = fl.file_id AND
+            ff.face_id > %s AND
+            ff.merged_to IS NULL 
+        ORDER BY ff.face_id ASC
+        LIMIT %s
+    """
+
+    cursor.execute(query, (embedding,person_id,last_face_id,max_rows))
+    rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Serialize the results and return the response
+    if len(rows):
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
 # Search the mbox_voice table using an audio file ###################################################
 @csrf_exempt
 @permission_classes([IsAuthenticated])
@@ -420,7 +486,7 @@ def search_media(request):
     labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url', 
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
-        'owner_rights', 'group_rights', 'public_rights', 'ip_location', 'remarks', 'version', 
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 'version', 
         'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
         'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'rank'];
 
@@ -429,7 +495,7 @@ def search_media(request):
         SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
-            fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
             fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
             fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
             ts_rank(search_text,to_tsquery('english',%s)) AS rank
@@ -448,7 +514,7 @@ def search_media(request):
         SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
-            fl.owner_rights, fl.group_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
             fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
             fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
             fl.file_id AS rank
@@ -457,6 +523,113 @@ def search_media(request):
             fd.path_name LIKE %s AND
             fl.media_type IN ({}) AND 
             NOT fl.is_deleted 
+        ORDER BY file_id ASC
+        LIMIT %s
+        OFFSET %s
+        """.format(placeholders)
+
+    rows = []
+    with connection.cursor() as cursor:
+        if len(pattern) > 0:
+            pattern = pattern.lower()
+            params = (pattern, scope) + media_types + (pattern, max_rows, offset)
+            cursor.execute(query, params)
+        else:
+            params = (scope,) + media_types + (max_rows, offset)
+            cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Serialize the results and return the response
+    if len(rows):
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
+# Get items in the recycle bin #################################################
+# This is identical to search_media() + is_deleted = True                      #
+################################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_recycle_bin(request):
+    # Extract and validate subscription ID and client secret
+    subscription_id = request.headers.get('Subscription-ID')
+    client_secret = request.headers.get('Client-Secret')
+    max_rows = request.headers.get('Max-Rows')
+    start_from = request.headers.get('Start-From')
+    pattern = request.headers.get('Pattern')
+    scope = request.headers.get('Scope')
+    media_type = request.headers.get('Media-Type')
+
+    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
+        return JsonResponse({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    offset = 0
+    if start_from is not None:
+        offset = start_from
+
+    # Append a wild card for the LIKE operator
+    if scope[-1] != '/':
+        scope += '/%'
+    else:
+        scope += '%'
+
+    # Default media type is video
+    if media_type is None:
+        media_types = ('video',)
+        placeholders = '%s'
+    else:
+        media_types = tuple(media_type.split(','))
+        placeholders = ','.join(['%s'] * len(media_types))
+
+    # Replace double quotes with single quotes if necessary
+    if bool(re.match(r'^".*"$',pattern)):
+        pattern = "'" + pattern[1:-1] + "'"
+
+    # Search for matching records in the database
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url',
+        'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places',
+        'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 'version',
+        'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher',
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'rank'];
+
+    if len(pattern) > 0:
+        query = """
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+            fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
+            fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
+            fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
+            ts_rank(search_text,to_tsquery('english',%s)) AS rank
+        FROM mbox_file fl, mbox_folder fd
+        WHERE fl.folder_id = fd.folder_id AND 
+            fd.path_name LIKE %s AND
+            fl.media_type IN ({}) AND 
+            fl.is_deleted AND 
+            search_text @@ to_tsquery('english',%s)
+        ORDER BY rank DESC
+        LIMIT %s
+        OFFSET %s
+        """.format(placeholders)
+    else:
+        query = """
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+            fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
+            fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
+            fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
+            fl.file_id AS rank
+        FROM mbox_file fl, mbox_folder fd
+        WHERE fl.folder_id = fd.folder_id AND 
+            fd.path_name LIKE %s AND
+            fl.media_type IN ({}) AND 
+            fl.is_deleted 
         ORDER BY file_id ASC
         LIMIT %s
         OFFSET %s
@@ -499,7 +672,7 @@ def get_media(request, file_id):
     labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 
         'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 
         'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
-        'group_name', 'owner_rights', 'group_rights', 'public_rights', 'ip_location',
+        'group_name', 'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
         'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 
         'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
     rows = []
@@ -507,7 +680,7 @@ def get_media(request, file_id):
         SELECT f1.file_id, f1.folder_id, f1.name, f2.path_name, f1.extension, f1.media_source, f1.size, 
             f1.file_url, f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, 
             f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
-            f1.group_name, f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
+            f1.group_name, f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
             f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
             f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
         FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
@@ -551,7 +724,7 @@ def get_adjacent_media(request, file_id):
     labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 'file_url', 
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 'texts', 
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
-        'owner_rights', 'group_rights', 'public_rights', 'ip_location',
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
         'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject',
         'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
     rows = []
@@ -572,7 +745,7 @@ def get_adjacent_media(request, file_id):
     SELECT f1.file_id, f1.folder_id, f1.name, f2.path_name, f1.extension, f1.media_source, f1.size, f1.file_url, 
         f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, f1.places, f1.texts, 
         f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, f1.group_name, 
-        f1.owner_rights, f1.group_rights, f1.public_rights, f1.ip_location,
+        f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
         f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
             f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
     FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
@@ -614,14 +787,14 @@ def get_folder(request, folder_id):
     # Search for matching records in the database
     labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
-        'owner_rights', 'group_rights', 'public_rights', 'subfolder_count', 'file_count', 
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'subfolder_count', 'file_count', 
         'video_count', 'audio_count', 'photo_count', 'reviewed_count', 'page_count', 'stats_as_of',
         'parent_id', 'remarks', 'schema_id', 'extra_data'];
     rows = []
     query = """
         SELECT folder_id, name, path, size, date_created, folder_level, description,
             last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
-            owner_rights, group_rights, public_rights, subfolder_count, file_count, 
+            owner_rights, group_rights, domain_rights, public_rights, subfolder_count, file_count, 
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
             parent_id, remarks, schema_id, extra_data
         FROM mbox_folder
@@ -657,14 +830,14 @@ def get_folders(request, parent_id):
     # Search for matching records in the database
     labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
-        'owner_rights', 'group_rights', 'public_rights', 'subfolder_count', 'file_count', 
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'subfolder_count', 'file_count', 
         'video_count', 'audio_count', 'photo_count', 'reviewed_count', 'page_count', 'stats_as_of',
         'parent_id', 'remarks', 'schema_id', 'extra_data'];
     rows = []
     query = """
         SELECT folder_id, name, path, size, date_created, folder_level, description,
             last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
-            owner_rights, group_rights, public_rights, subfolder_count, file_count, 
+            owner_rights, group_rights, domain_rights, public_rights, subfolder_count, file_count, 
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
             parent_id, remarks, schema_id, extra_data
         FROM mbox_folder
@@ -1379,6 +1552,20 @@ def reports_viewer(request):
         'is_supervisor': is_supervisor,
     }
     return render(request, 'reports.html', context)
+
+@login_required
+def library_viewer(request):
+    groups = request.user.groups.all()
+    is_editor = groups.filter(name=settings.MBOX_EDITORS_GROUP).exists()
+    is_supervisor = groups.filter(name=settings.MBOX_SUPERVISORS_GROUP).exists()
+    context = { 
+        'file_id':request.GET.get('file_id','0'), 
+        'file_name':request.GET.get('file_name',''),
+        'username':request.user.first_name,
+        'is_editor': is_editor,
+        'is_supervisor': is_supervisor,
+    }
+    return render(request, 'library.html', context)
 
 # Helper functions #################################################################################
 # Insert audit record ##############################################################################

@@ -1,0 +1,7 @@
+curl -X GET -b "sessionid=8m8omfud9q45xwl8c62mn991nfd4jb1l" http://localhost:8000/api/get-linked-faces/920/ \
+-H "Content-Type: application/json" \
+-H "Subscription-ID: 00000000" \
+-H "Client-Secret: 00000000" \
+-H "Max-Rows: 5" \
+-H "Start-From: {\"face_id\":12100}" \
+-H "X-CSRFToken: oAOJ6uqaImSljYATzfyfNyFhgNjkh3H5" 

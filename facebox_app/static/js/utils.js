@@ -159,6 +159,15 @@ function goToVideos(file_id,file_name) {
     window.location.href = href;
 }
 
+function goToLibrary(file_id,fileName) {
+    href = "/app/library/";
+    if (file_id != null && file_name != null) {
+        file_name = encodeURIComponent(file_name);
+        href += '?file_id=' + file_id + '&file_name=' + file_name;
+    }
+    window.location.href = href;
+}
+
 function goToReports(file_id,fileName) {
     href = "/app/reports/";
     if (file_id != null && file_name != null) {

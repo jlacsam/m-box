@@ -2,7 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.login, name='login'),
+    path('', views.app_login, name='app_login'),
     path('login/', views.app_login, name='app_login'),
     path('logout/', views.app_logout, name='app_logout'),
     path('search/', views.search_face, name='search_face'),
@@ -13,6 +13,7 @@ urlpatterns = [
     path('audios/', views.audio_search, name='audio_search'),
     path('media-player/', views.media_player, name='media_player'),
     path('photo-viewer/', views.photo_viewer, name='photo_viewer'),
+    path('library/', views.library_viewer, name='library_viewer'),
     path('reports/', views.reports_viewer, name='reports_viewer'),
     path('get-audit/<int:file_id>/', views.get_audit, name='get_audit'),
     path('get-diary/<int:file_id>/', views.get_diary, name='get_diary'),
@@ -26,6 +27,7 @@ urlpatterns = [
     path('get-thumbnail/<int:file_id>/', views.get_thumbnail, name='get_thumbnail'),
     path('get-file-count/<int:folder_id>/', views.get_file_count, name='get_file_count'),
     path('get-file-position/<int:file_id>/', views.get_file_position, name='get_file_position'),
+    path('get-linked-faces/<int:person_id>/', views.get_linked_faces, name='get_linked_faces'),
     path('merge-persons/<int:person_id>/', views.merge_persons, name='merge_persons'),
     path('refresh-folder-stats/<int:folder_id>/', views.refresh_folder_stats, name='refresh_folder_stats'),
     path('search-audit/', views.search_audit, name='search_audit'),

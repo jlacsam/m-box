@@ -471,7 +471,7 @@ ul li:hover {
     cursor: pointer;
 }
 
-#voices-tab, #reports-tab {
+#voices-tab, #reports-tab, #library-tab {
     color: #888888;
     width: 100%;
     transition: color 0.3s ease;
@@ -479,7 +479,7 @@ ul li:hover {
     padding-right:10px;
 }
 
-#voices-tab:hover, #reports-tab:hover {
+#voices-tab:hover, #reports-tab:hover, #library-tab:hover {
     color: #00bbbb;
     cursor: pointer;
 }
