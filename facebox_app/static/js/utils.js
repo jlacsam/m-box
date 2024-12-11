@@ -371,6 +371,7 @@ function trimWhitespaces(str) {
 }
 
 function truncateAtWord(str, maxLength = 500, suffix = '...') {
+    if (str === null) return '';
     if (str.length <= maxLength) return str;
     const idx = str.lastIndexOf(' ', maxLength);
     return idx !== -1 ? str.substring(0, idx) + suffix : str.substring(0, maxLength) + suffix;
