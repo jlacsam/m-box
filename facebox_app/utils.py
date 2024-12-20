@@ -6,6 +6,7 @@ from keras_facenet import FaceNet
 from mtcnn import MTCNN
 from PIL import Image
 from pydub import AudioSegment
+from .models import FbxFile, FbxFolder
 
 # Initialize FaceNet model and MTCNN detector
 facenet = FaceNet()
@@ -118,4 +119,109 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+# Check Folder Permissions #####################################################
+def check_folder_permission(request,folder_id,action):
+    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    user = request.user
+    groups = request.user.groups.all()
+
+    if action == 'list': # List the contents of the folder
+        if folder.public_rights & 4 and folder.public_rights & 1: # r-x : list filenames and details
+            return True
+        if user: # User exists in the domain
+            if folder.domain_rights & 4 and folder.domain_rights & 1:
+                return True
+        if groups.filter(name=folder.group_name).exists():
+            if folder.group_rights & 4 and folder.group_rights & 1:
+                return True
+        if folder.owner_name.lower() == user.username.lower():
+            if folder.owner_rights & 4 and folder.owner_rights & 1:
+                return True
+
+    if action == 'update' or action == 'rename' or action == 'add': # Update metadata, rename or add folder/file
+        if folder.public_rights & 2 and folder.public_rights & 1: # -wx
+            return True
+        if user: # User exists in the domain
+            if folder.domain_rights & 2 and folder.domain_rights & 1:
+                return True
+        if groups.filter(name=folder.group_name).exists():
+            if folder.group_rights & 2 and folder.group_rights & 1:
+                return True
+        if folder.owner_name.lower() == user.username.lower():
+            if folder.owner_rights & 2 and folder.owner_rights & 1:
+                return True
+
+    if action == 'delete' or action == 'restore':
+        parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
+        if parent.public_rights & 2 and parent.public_rights & 1 and \
+            folder.public_rights & 2 and folder.public_rights & 1: # -wx
+            return True
+        if user: # User exists in the domain
+            if parent.domain_rights & 2 and parent.domain_rights & 1 and \
+                folder.domain_rights & 2 and folder.domain_rights & 1: # -wx
+                return True
+        if groups.filter(name=parent.group_name).exists():
+            if parent.group_rights & 2 and parent.group_rights & 1 and \
+                folder.group_rights & 2 and folder.group_rights & 1: # -wx
+                return True
+        if parent.owner_name.lower() == user.username.lower():
+            if parent.owner_rights & 2 and parent.owner_rights & 1 and \
+                folder.owner_rights & 2 and folder.owner_rights & 1: # -wx
+                return True
+
+    return False
+
+# Check File Permissions #####################################################
+def check_file_permission(request,file_id,action):
+    file = get_object_or_404(FbxFile, file_id=file_id)
+    folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
+    user = request.user
+    groups = request.user.groups.all()
+
+    # Unix systems require execute permission on the entire tree but
+    # we will relax that rule. Execute permission on the parent is enough.
+    has_execute = False
+    if folder.public_rights & 1: # --x
+        has_execute = True
+    if user: # User exists in the domain
+        if folder.domain_rights & 1:
+            has_execute = True
+    if groups.filter(name=folder.group_name).exists():
+        if folder.group_rights & 1:
+            has_eexecute = True
+    if folder.owner_name.lower() == user.username.lower():
+        if folder.owner_rights & 1:
+            has_execute = True
+
+    if not has_execute:
+        return False
+
+    if action == 'download':
+        if file.public_rights & 4: # r--
+            return True
+        if user: # User exists in the domain
+            if file.domain_rights & 4:
+                return True
+        if groups.filter(name=file.group_name).exists():
+            if file.group_rights & 4:
+                return True
+        if file.owner_name.lower() == user.username.lower():
+            if file.owner_rights & 4:
+                return True
+
+    if action == 'update' or action == 'rename':
+        if file.public_rights & 2: # r--
+            return True
+        if user: # User exists in the domain
+            if file.domain_rights & 2:
+                return True
+        if groups.filter(name=file.group_name).exists():
+            if file.group_rights & 2:
+                return True
+        if file.owner_name.lower() == user.username.lower():
+            if file.owner_rights & 2:
+                return True
+
+    return False
 

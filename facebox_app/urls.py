@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Endpoints that renders an HTML page
     path('', views.app_login, name='app_login'),
     path('login/', views.app_login, name='app_login'),
     path('logout/', views.app_logout, name='app_logout'),
@@ -15,6 +16,8 @@ urlpatterns = [
     path('photo-viewer/', views.photo_viewer, name='photo_viewer'),
     path('library/', views.library_viewer, name='library_viewer'),
     path('reports/', views.reports_viewer, name='reports_viewer'),
+    path('api-tester/', views.api_tester, name='api_tester'),
+    # APIs that retrieve data
     path('get-audit/<int:file_id>/', views.get_audit, name='get_audit'),
     path('get-diary/<int:file_id>/', views.get_diary, name='get_diary'),
     path('get-folder/<int:folder_id>/', views.get_folder, name='get_folder'),
@@ -25,11 +28,7 @@ urlpatterns = [
     path('get-media/<int:file_id>/', views.get_media, name='get_media'),
     path('get-adjacent-media/<int:file_id>/', views.get_adjacent_media, name='get_adjacent_media'),
     path('get-thumbnail/<int:file_id>/', views.get_thumbnail, name='get_thumbnail'),
-    path('get-file-count/<int:folder_id>/', views.get_file_count, name='get_file_count'),
-    path('get-file-position/<int:file_id>/', views.get_file_position, name='get_file_position'),
     path('get-linked-faces/<int:person_id>/', views.get_linked_faces, name='get_linked_faces'),
-    path('merge-persons/<int:person_id>/', views.merge_persons, name='merge_persons'),
-    path('refresh-folder-stats/<int:folder_id>/', views.refresh_folder_stats, name='refresh_folder_stats'),
     path('search-audit/', views.search_audit, name='search_audit'),
     path('search-face/', views.search_face, name='search_face'),
     path('search-voice/', views.search_voice, name='search_voice'),
@@ -40,9 +39,31 @@ urlpatterns = [
     path('search-photo/', views.search_media, name='search_photo'),
     path('search-person/', views.search_person, name='search_person'),
     path('stream-audio/<int:file_id>/', views.stream_audio, name='stream_audio'),
+    # APIs that get information about the datai, create data or modify the data
+    # 'create-folder/<int:parent_id>/'
+    # 'delete-file/<int:file_id>/'
+    # 'delete-folder/<int:folder_id>/'
+    path('get-file-count/<int:folder_id>/', views.get_file_count, name='get_file_count'),
+    path('get-file-position/<int:file_id>/', views.get_file_position, name='get_file_position'),
+    path('merge-persons/<int:person_id>/', views.merge_persons, name='merge_persons'),
+    # 'move-file/<int:file_id>/<int:target_folder>/'
+    # 'move-folder/<int:folder_id>/<int:target_folder>/'
+    path('refresh-folder-stats/<int:folder_id>/', views.refresh_folder_stats, name='refresh_folder_stats'),
+    # 'rename-file/<int:file_id>/<str:name>/'
+    # 'rename-folder/<int:folder_id>/<str:name>/'
+    # 'restore-file/<int:file_id>/'
+    # 'restore-folder/<int:folder_id>/'
+    # 'set-file-group/<int:file_id>/<str:group_name>/'
+    # 'set-file-owner/<int:file_id>/<str:owner_name>/'
+    # 'set-file-permission/<int:file_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/'
+    # 'set-folder-group/<int:folder_id>/<str:group_name>/'
+    # 'set-folder-owner/<int:folder_id>/<str:owner_name>/'
+    # 'set-folder-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/'
     path('unlink-faces/<int:person_id>/', views.unlink_faces, name='unlink_faces'),
     path('update-file/<int:file_id>/', views.update_file, name='update_file'),
+    # 'update-folder/<int:folder_id>/'
     path('update-person/<int:person_id>/', views.update_person, name='update_person'),
     path('update-transcript-segment/<int:file_id>/', views.update_transcript_segment, name='update_transcript_segment'),
+    # 'upload-file/<int:folder_id>/'
 ]
 

@@ -8,113 +8,6 @@ from django.core.files.storage import default_storage
 
 from .utils import get_client_ip
 
-# Check Folder Permissions #####################################################
-def check_folder_permission(request,folder_id,action):
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
-    user = request.user
-    groups = request.user.groups.all()
-
-    if action == 'list': # List the contents of the folder
-        if folder.public_rights & 4 and folder.public_rights & 1: # r-x : list filenames and details
-            return True
-        if user: # User exists in the domain
-            if folder.domain_rights & 4 and folder.domain_rights & 1:
-                return True
-        if groups.filter(name=folder.group_name).exists():
-            if folder.group_rights & 4 and folder.group_rights & 1:
-                return True
-        if folder.owner_name.lower() == user.username.lower():
-            if folder.owner_rights & 4 and folder.owner_rights & 1: 
-                return True
-
-    if action == 'update' || action == 'rename' || action == 'add': # Update metadata, rename or add folder/file
-        if folder.public_rights & 2 and folder.public_rights & 1: # -wx
-            return True
-        if user: # User exists in the domain
-            if folder.domain_rights & 2 and folder.domain_rights & 1:
-                return True
-        if groups.filter(name=folder.group_name).exists():
-            if folder.group_rights & 2 and folder.group_rights & 1:
-                return True
-        if folder.owner_name.lower() == user.username.lower():
-            if folder.owner_rights & 2 and folder.owner_rights & 1: 
-                return True
-
-    if action == 'delete' || action == 'restore':
-        parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
-        if parent.public_rights & 2 and parent.public_rights & 1 and 
-            folder.public_rights & 2 and folder.public_rights & 1: # -wx
-            return True
-        if user: # User exists in the domain
-            if parent.domain_rights & 2 and parent.domain_rights & 1
-                folder.domain_rights & 2 and folder.domain_rights & 1: # -wx
-                return True
-        if groups.filter(name=parent.group_name).exists():
-            if parent.group_rights & 2 and parent.group_rights & 1
-                folder.group_rights & 2 and folder.group_rights & 1: # -wx
-                return True
-        if parent.owner_name.lower() == user.username.lower():
-            if parent.owner_rights & 2 and parent.owner_rights & 1
-                folder.owner_rights & 2 and folder.owner_rights & 1: # -wx
-                return True
-
-    return False
-
-
-# Check File Permissions #####################################################
-def check_file_permission(request,file_id,action):
-    file = get_object_or_404(FbxFile, file_id=file_id)
-    folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
-    user = request.user
-    groups = request.user.groups.all()
-
-    # Unix systems require execute permission on the entire tree but
-    # we will relax that rule. Execute permission on the parent is enough.
-    has_execute = False 
-    if folder.public_rights & 1: # --x
-        has_execute = True
-    if user: # User exists in the domain
-        if folder.domain_rights & 1:
-            has_execute = True
-    if groups.filter(name=folder.group_name).exists():
-        if folder.group_rights & 1:
-            has_eexecute = True
-    if folder.owner_name.lower() == user.username.lower():
-        if folder.owner_rights & 1: 
-            has_execute = True
-
-    if not has_execute:
-        return False
-
-    if action == 'download':
-        if file.public_rights & 4: # r--
-            return True
-        if user: # User exists in the domain
-            if file.domain_rights & 4:
-                return True
-        if groups.filter(name=file.group_name).exists():
-            if file.group_rights & 4:
-                return True
-        if file.owner_name.lower() == user.username.lower():
-            if file.owner_rights & 4: 
-                return True
-
-    if action == 'update' || action == 'rename':
-        if file.public_rights & 2: # r--
-            return True
-        if user: # User exists in the domain
-            if file.domain_rights & 2:
-                return True
-        if groups.filter(name=file.group_name).exists():
-            if file.group_rights & 2:
-                return True
-        if file.owner_name.lower() == user.username.lower():
-            if file.owner_rights & 2: 
-                return True
-
-    return JsonResponse({'result':'false'})
-
-
 # Create Folder ################################################################
 @require_http_methods(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -170,6 +63,7 @@ def rename_folder(request,folder_id,name):
     try:
         folder = get_object_or_404(FbxFolder, folder_id=folder_id)
         old_path_name = folder.path_name
+        old_path = folder.path
         folder.name = name
         folder.save()
     except Exception as e:
@@ -177,14 +71,14 @@ def rename_folder(request,folder_id,name):
 
     # Update the path of all of its children folders
     # Only update the path. The trigger will take care of the path_name.
-    query = f"""
-        UPDATE mbox_folder
-        SET path = %s
-        WHERE path LIKE %s
-    """
-    TO DO
+    new_path = old_path + name + '/'
+    pattern = old_path_name + '%'
+    query = "UPDATE mbox_folder SET path = REPLACE(path,%s,%s) WHERE path LIKE %s"
+    with connection.cursor() as cursor:
+        cursor.execute(query, (old_path_name,new_path,pattern))
+        affected = cursor.rowcount()
 
-    return JsonResponse({'result':'success'}, status=status.HTTP_200_OK)
+    return JsonResponse({'result':'success','affected':affected}, status=status.HTTP_200_OK)
 
 
 # Rename File ##################################################################
@@ -388,15 +282,24 @@ def move_folder(request,folder_id,target_folder):
 
     try:
         folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+        old_parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
+        new_parent = get_object_or_404(FbxFolder, folder_id=target_folder)
+        old_path_name = folder.path_name
         folder.parent_id = target_folder
+        folder.path = new_path
         folder.save()
     except Exception as e:
         return JsonResponse({'error':f'{e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # TO DO
     # Update paths of all children
+    new_path_name = new_parent.path_name + folder.name + '/'
+    pattern = old_path_name + '%'
+    query = "UPDATE mbox_folder SET path = REPLACE(path,%s,%s) WHERE path LIKE %s"
+    with connection.cursor() as cursor:
+        cursor.execute(query, (old_path_name,new_path_name,pattern))
+        affected = cursor.rowcount()
 
-    return JsonResponse({'result':'success'}, status=status.HTTP_200_OK)
+    return JsonResponse({'result':'success','affected':affected}, status=status.HTTP_200_OK)
 
 
 # Move file from one folder to another #########################################
@@ -542,6 +445,8 @@ def upload_file(request,folder_id):
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return JsonResponse({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
+    # TO DO check permissions
+
     if 'file' not in request.FILES:
         return JsonResponse({'error':'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -649,7 +554,7 @@ def update_folder(request,folder_id):
             row.save(update_fields=updated_fields)
             # Insert audit record, update last_modified
             insert_audit(request.user.username,'UPDATE','mbox_folder',file_id,old_data,new_data,get_client_ip(request))
-            update_last_modified(folder_id) # TO DO implement for mbox_folder
+            update_last_modified(folder_id,'folder')
             return JsonResponse({
                 'message': f'Metadata updated for file {file_id}',
                 'update_fields': updated_fields

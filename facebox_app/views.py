@@ -1567,6 +1567,19 @@ def library_viewer(request):
     }
     return render(request, 'library.html', context)
 
+@login_required
+def api_tester(request):
+    groups = request.user.groups.all()
+    is_developer = groups.filter(name=settings.MBOX_DEVELOPERS_GROUP).exists()
+    context = { 
+        'file_id':request.GET.get('file_id','0'), 
+        'file_name':request.GET.get('file_name',''),
+        'username':request.user.first_name,
+        'is_developer': is_developer,
+    }
+    return render(request, 'api_tester.html', context)
+
+
 # Helper functions #################################################################################
 # Insert audit record ##############################################################################
 def insert_audit(username,activity,table_name,record_id,old_data,new_data,location):
@@ -1593,9 +1606,12 @@ def update_last_accessed(file_id):
     except Exception as e:
         print(f"Error occurred: {e}")
 
-def update_last_modified(file_id):
+def update_last_modified(file_id,target='file'):
     try:
-        row = get_object_or_404(FbxFile, file_id=file_id)
+        if target == 'folder':
+            row = get_object_or_404(FbxFolder, folder_id=folder_id)
+        else:
+            row = get_object_or_404(FbxFile, file_id=file_id)
         row.last_modified = timezone.now()
         row.save()
     except Exception as e:
