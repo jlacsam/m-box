@@ -770,7 +770,7 @@ function getAudit(file_id) {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'Max-Rows': maxRows,
-            'Source-Table': 'mbx_person',
+            'Source-Table': 'mbox_person',
             'X-CSRFToken': csrftoken,
         }
     })
