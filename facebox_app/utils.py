@@ -7,6 +7,7 @@ from mtcnn import MTCNN
 from PIL import Image
 from pydub import AudioSegment
 from .models import FbxFile, FbxFolder
+from django.shortcuts import get_object_or_404
 
 # Initialize FaceNet model and MTCNN detector
 facenet = FaceNet()
@@ -126,16 +127,24 @@ def check_folder_permission(request,folder_id,action):
     user = request.user
     groups = request.user.groups.all()
 
+    if not user:
+        return False
+
     if action == 'list': # List the contents of the folder
         if folder.public_rights & 4 and folder.public_rights & 1: # r-x : list filenames and details
             return True
         if user: # User exists in the domain
             if folder.domain_rights & 4 and folder.domain_rights & 1:
                 return True
-        if groups.filter(name=folder.group_name).exists():
-            if folder.group_rights & 4 and folder.group_rights & 1:
-                return True
-        if folder.owner_name.lower() == user.username.lower():
+        if groups:
+            if groups.filter(name=folder.group_name).exists():
+                if folder.group_rights & 4 and folder.group_rights & 1:
+                    return True
+        if folder.owner_name:
+            if folder.owner_name.lower() == user.username.lower():
+                if folder.owner_rights & 4 and folder.owner_rights & 1:
+                    return True
+        if user.is_superuser:
             if folder.owner_rights & 4 and folder.owner_rights & 1:
                 return True
 
@@ -145,10 +154,15 @@ def check_folder_permission(request,folder_id,action):
         if user: # User exists in the domain
             if folder.domain_rights & 2 and folder.domain_rights & 1:
                 return True
-        if groups.filter(name=folder.group_name).exists():
-            if folder.group_rights & 2 and folder.group_rights & 1:
-                return True
-        if folder.owner_name.lower() == user.username.lower():
+        if groups:
+            if groups.filter(name=folder.group_name).exists():
+                if folder.group_rights & 2 and folder.group_rights & 1:
+                    return True
+        if folder.owner_name:
+            if folder.owner_name.lower() == user.username.lower():
+                if folder.owner_rights & 2 and folder.owner_rights & 1:
+                    return True
+        if user.is_superuser:
             if folder.owner_rights & 2 and folder.owner_rights & 1:
                 return True
 
@@ -161,14 +175,27 @@ def check_folder_permission(request,folder_id,action):
             if parent.domain_rights & 2 and parent.domain_rights & 1 and \
                 folder.domain_rights & 2 and folder.domain_rights & 1: # -wx
                 return True
-        if groups.filter(name=parent.group_name).exists():
-            if parent.group_rights & 2 and parent.group_rights & 1 and \
-                folder.group_rights & 2 and folder.group_rights & 1: # -wx
-                return True
-        if parent.owner_name.lower() == user.username.lower():
+        if groups:
+            if groups.filter(name=parent.group_name).exists():
+                if parent.group_rights & 2 and parent.group_rights & 1 and \
+                    folder.group_rights & 2 and folder.group_rights & 1: # -wx
+                    return True
+        if parent.owner_name:
+            if parent.owner_name.lower() == user.username.lower():
+                if parent.owner_rights & 2 and parent.owner_rights & 1 and \
+                    folder.owner_rights & 2 and folder.owner_rights & 1: # -wx
+                    return True
+        if user.is_superuser:
             if parent.owner_rights & 2 and parent.owner_rights & 1 and \
                 folder.owner_rights & 2 and folder.owner_rights & 1: # -wx
                 return True
+
+    if action in [ 'set_owner', 'set_group', 'set_permission' ]:
+        if folder.owner_name:
+            if folder.owner_name.lower() == user.username.lower():
+                return True
+        if user.is_superuser:
+            return True
 
     return False
 
@@ -179,6 +206,9 @@ def check_file_permission(request,file_id,action):
     user = request.user
     groups = request.user.groups.all()
 
+    if not user:
+        return False
+
     # Unix systems require execute permission on the entire tree but
     # we will relax that rule. Execute permission on the parent is enough.
     has_execute = False
@@ -187,10 +217,15 @@ def check_file_permission(request,file_id,action):
     if user: # User exists in the domain
         if folder.domain_rights & 1:
             has_execute = True
-    if groups.filter(name=folder.group_name).exists():
-        if folder.group_rights & 1:
-            has_eexecute = True
-    if folder.owner_name.lower() == user.username.lower():
+    if groups:
+        if groups.filter(name=folder.group_name).exists():
+            if folder.group_rights & 1:
+                has_execute = True
+    if folder.owner_name:
+        if folder.owner_name.lower() == user.username.lower():
+            if folder.owner_rights & 1:
+                has_execute = True
+    if user.is_superuser:
         if folder.owner_rights & 1:
             has_execute = True
 
@@ -203,25 +238,96 @@ def check_file_permission(request,file_id,action):
         if user: # User exists in the domain
             if file.domain_rights & 4:
                 return True
-        if groups.filter(name=file.group_name).exists():
-            if file.group_rights & 4:
-                return True
-        if file.owner_name.lower() == user.username.lower():
+        if groups:
+            if groups.filter(name=file.group_name).exists():
+                if file.group_rights & 4:
+                    return True
+        if file.owner_name:
+            if file.owner_name.lower() == user.username.lower():
+                if file.owner_rights & 4:
+                    return True
+        if user.is_superuser:
             if file.owner_rights & 4:
                 return True
 
     if action == 'update' or action == 'rename':
-        if file.public_rights & 2: # r--
+        if file.public_rights & 2: # -w-
             return True
         if user: # User exists in the domain
             if file.domain_rights & 2:
                 return True
-        if groups.filter(name=file.group_name).exists():
-            if file.group_rights & 2:
-                return True
-        if file.owner_name.lower() == user.username.lower():
+        if groups:
+            if groups.filter(name=file.group_name).exists():
+                if file.group_rights & 2:
+                    return True
+        if file.owner_name:
+            if file.owner_name.lower() == user.username.lower():
+                if file.owner_rights & 2:
+                    return True
+        if user.is_superuser:
             if file.owner_rights & 2:
                 return True
 
+    if action == 'delete' or action == 'restore':
+        if folder.public_rights & 2: # -w-
+            return True
+        if user:
+            if folder.domain_rights & 2:
+                return True
+        if groups:
+            if groups.filter(name=folder.group_name).exists():
+                if folder.group_rights & 2:
+                    return True
+        if folder.owner_name:
+            if folder.owner_name.lower() == user.username.lower():
+                if folder.owner_rights & 2:
+                    return True
+        if user.is_superuser:
+            if folder.owner_rights & 2:
+                return True
+
+    if action in [ 'set_owner', 'set_group', 'set_permission' ]:
+        if file.owner_name:
+            if file.owner_name.lower() == user.username.lower():
+                return True
+        if user.is_superuser:
+            return True
+
     return False
+
+# Insert audit record ##########################################################
+def insert_audit(username,activity,table_name,record_id,old_data,new_data,location):
+    try:
+        audit = FbxAudit(
+            username = username,
+            activity = activity,
+            table_name = table_name,
+            record_id = record_id,
+            old_data = old_data,
+            new_data = new_data,
+            location = location
+        )
+
+        audit.save()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+def update_last_accessed(file_id):
+    try:
+        row = get_object_or_404(FbxFile, file_id=file_id)
+        row.last_accessed = timezone.now()
+        row.save()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+def update_last_modified(file_id,target='file'):
+    try:
+        if target == 'folder':
+            row = get_object_or_404(FbxFolder, folder_id=folder_id)
+        else:
+            row = get_object_or_404(FbxFile, file_id=file_id)
+        row.last_modified = timezone.now()
+        row.save()
+    except Exception as e:
+        print(f"Error occurred: {e}")
 

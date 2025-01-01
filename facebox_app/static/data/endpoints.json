@@ -6,8 +6,8 @@
       "method"     : "POST",
       "headers"    : [],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : [ { "username" : "username" }, { "password" : "password" } ],
+      "outputs"    : [ { "message" : "success" }, { "message" : "fail" } ],
       "status"     : "V1.0"
     },
     {
@@ -26,9 +26,9 @@
       "description": "This is an alias of /search-face/.",
       "endpoint"   : "search/", 
       "method"     : "POST",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Similarity", "Max-Rows", "Video-List", "Start-From" ],
       "parameters" : [],
-      "body"       : [],
+      "body"       : "application/octet-stream",
       "outputs"    : [],
       "status"     : "V1.0"
     },
@@ -136,10 +136,10 @@
       "description": "Retrieves audit records associated with the specified file_id.",
       "endpoint"   : "get-audit/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Source-Table" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" } ],
       "status"     : "V1.0"
     },
     {
@@ -147,10 +147,10 @@
       "description": "Retrieves the list of speech segments in the specified file_id.",
       "endpoint"   : "get-diary/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" } ],
       "status"     : "V1.0"
     },
     {
@@ -158,10 +158,10 @@
       "description": "Retrieves folder details for the speficied folder_id.",
       "endpoint"   : "get-folder/<int:folder_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -169,10 +169,10 @@
       "description": "Retrieves folders whose parent folder is parent_id.",
       "endpoint"   : "get-folders/<int:parent_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Parent ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -180,10 +180,10 @@
       "description": "Retrieves the list of groups to which the authenticated user is a member of.",
       "endpoint"   : "get-groups/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "groups" : [ "group1", "group2", "group3" ] }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -191,10 +191,10 @@
       "description": "Retrieves a JPEG thumbnail image associated with the speficied face_id.",
       "endpoint"   : "get-image/<int:face_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Face ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "blob" : "content_type=image/jpeg" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -202,10 +202,10 @@
       "description": "Retrieves the transcript in WebVTT format of the file associated with the specified file_id.",
       "endpoint"   : "get-transcript/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "transcript" : "web vtt" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -213,10 +213,10 @@
       "description": "Retrieves the media record associated with the specified file_id.",
       "endpoint"   : "get-media/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -224,10 +224,10 @@
       "description": "Retrieves the media record adjacent to the specified file_id.",
       "endpoint"   : "get-adjacent-media/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Direction", "Media-Type", "Folder-ID", "Skip-Status" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -235,10 +235,10 @@
       "description": "Retrieves the JPEG thumbnail associated with the specified file_id.",
       "endpoint"   : "get-thumbnail/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "blob" : "content_type=image/jpeg" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -246,10 +246,10 @@
       "description": "Retrieves the face records that are linked to the specified person_id.",
       "endpoint"   : "get-linked-faces/<int:person_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Start-From" ],
+      "parameters" : [ { "name" : "Person ID", "type" : "int"} ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V0.9"
     },
     {
@@ -257,10 +257,10 @@
       "description": "Retrieves audit records based on the specified search criteria, including username and a range of event timestamps.",
       "endpoint"   : "search-audit/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Username", "Start-Date", "End-Date" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -268,10 +268,10 @@
       "description": "Performs a similarity-based search in the face database to find faces matching the provided JPEG image.",
       "endpoint"   : "search-face/",
       "method"     : "POST",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Similarity", "Max-Rows", "Video-List", "Start-From" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : "content-type=image/jpeg",
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -279,10 +279,10 @@
       "description": "Performs a similarity search on voice records based on the audio file provided.",
       "endpoint"   : "search-voice/",
       "method"     : "POST",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Similarity", "Max-Rows", "Media-List", "Start-From" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : "content-type=audio/mp3",
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -290,10 +290,10 @@
       "description": "Searches the voice database for audio segments similar to the specified voice_id. The search is performed using a reference to a segment from another audio file stored in the database.",
       "endpoint"   : "search-voice-by-ref/<int:voice_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Similarity", "Max-Rows", "Media-List", "Start-From" ],
+      "parameters" : [ { "name" : "Voice ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -301,10 +301,10 @@
       "description": "Searches for media assets based on the specified criteria, including folder scope, media type and search pattern. The results are paginated and ranked based on relevance when a search pattern is provided.",
       "endpoint"   : "search-media/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Start-From", "Pattern", "Scope", "Media-Type" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -312,10 +312,10 @@
       "description": "This is an alias of /search-media/.",
       "endpoint"   : "search-video/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Start-From", "Pattern", "Scope", "Media-Type" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -323,10 +323,10 @@
       "description": "This is an alias of /search-media/.",
       "endpoint"   : "search-audio/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Start-From", "Pattern", "Scope", "Media-Type" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -334,10 +334,10 @@
       "description": "This is an alias of /search-media/.",
       "endpoint"   : "search-photo/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Max-Rows", "Start-From", "Pattern", "Scope", "Media-Type" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -345,10 +345,10 @@
       "description": "Retrieves person records based on optional filters, including video associates and pagination.",
       "endpoint"   : "search-person/",
       "method"     : "GET",
-      "headers"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Video-List", "Max-Rows", "Start-From" ],
       "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "body"       : null,
+      "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -356,20 +356,20 @@
       "description": "Streams an audio file from Azure Blob Storage starting from a specific offset.",
       "endpoint"   : "stream-audio/<int:file_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Time-Offset" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ "content-type=audio/mpeg", { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
       "name"       : "Create Folder",
       "description": "Creates a new subfolder in the folder specified by the given parent_id.",
       "endpoint"   : "create-folder/<int:parent_id>/",
-      "method"     : "PATCH",
-      "headers"    : [ "Subscription-ID", "Client-Secret", "Name", "Description", "Remarks" ],
+      "method"     : "POST",
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
       "parameters" : [ { "name" : "Parent ID", "type" : "int" } ],
-      "body"       : null,
+      "body"       : { "name" : "name", "description" : "description", "remarks" : "remarks" },
       "outputs"    : [ { "result" : "folder_id" }, { "error" : "Error description" } ],
       "status"     : "BETA"
     },
@@ -400,10 +400,10 @@
       "description": "Retrieves the number of files in a specified folder excluding deleted files.",
       "endpoint"   : "get-file-count/<int:folder_id>/",
       "method"     : "GET",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "result" : "count" }, { "error" : "Error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -411,10 +411,10 @@
       "description": "Retrieves the position of the specified file_id within its folder based on the number of files that come before it (including the file itself).",
       "endpoint"   : "get-file-position/<int:file_id>/",
       "method"     : null,
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret", "Folder-ID" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "result" : "count" }, { "error" : "Error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -422,10 +422,10 @@
       "description": "Merges multiple person records into the person identified by the person_id.",
       "endpoint"   : "merge-persons/<int:person_id>/",
       "method"     : "PATCH",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Person ID", "type" : "int" } ],
+      "body"       : [ "person_id1", "person_id2", "person_id3" ],
+      "outputs"    : [ { "rowcount" : "count" }, { "error" : "Error description" } ],
       "status"     : "V0.9"
     },
     {
@@ -455,10 +455,10 @@
       "description": "Recalculates the statistics of the folder associated with the specified folder_id.",
       "endpoint"   : "refresh-folder-stats/<int:folder_id>/",
       "method"     : null,
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" } ],
+      "body"       : null,
+      "outputs"    : [ { "rowcount" : "count" }, { "error" : "Error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -586,10 +586,10 @@
       "description": "Unlinks two or more faces from the person specified by the person_id.",
       "endpoint"   : "unlink-faces/<int:person_id>/",
       "method"     : "PATCH",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Person ID", "type" : "int" } ],
+      "body"       : [ "face_id1", "face_id2", "face_id3" ],
+      "outputs"    : [ { "rowcount" : "count" }, { "error" : "Error description" } ],
       "status"     : "V0.9"
     },
     {
@@ -597,10 +597,10 @@
       "description": "Updates specific fields of the file identified by the given file_id.",
       "endpoint"   : "update-file/<int:file_id>/",
       "method"     : null,
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : { "field1" : "new value1", "field2" : "new value2" },
+      "outputs"    : [ { "message" : "success" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -610,7 +610,7 @@
       "method"     : "PATCH",
       "headers"    : [ "Subscription-ID", "Client-Secret" ],
       "parameters" : [ { "name" : "Folder ID", "type" : "int" } ],
-      "body"       : [ { "field1" : "value1" }, { "field2" : "value2" }, { "field3" : "value3" } ],
+      "body"       : { "field1" : "value1" , "field2" : "value2" , "field3" : "value3" },
       "outputs"    : [ { "message" : "Metadata ...", "updated_fields" : [] }, { "error" : "Error description" } ],
       "status"     : "BETA"
     },
@@ -619,10 +619,10 @@
       "description": "Updates specific fields of the person record associated with the given person_id.",
       "endpoint"   : "update-person/<int:person_id>/",
       "method"     : "PATCH",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "Person ID", "type" : "int" } ],
+      "body"       : [ { "field1" : "new value1", "field2" : "new value2" } ],
+      "outputs"    : [ { "message" : "success" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -630,10 +630,10 @@
       "description": "Updates a specific segment of the transcript of the given file_id. The segment to be updated is determined by the given time reference.",
       "endpoint"   : "update-transcript-segment/<int:file_id>/",
       "method"     : "PATCH",
-      "headers"    : [],
-      "parameters" : [],
-      "body"       : [],
-      "outputs"    : [],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" } ],
+      "body"       : "Web VTT Time Segment",
+      "outputs"    : [ { "rowcount" : "count" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },
     {
@@ -641,7 +641,7 @@
       "description": "Uploads a file to the server's temporary local storage with the intention of forwarding the file to the permanent storage like AWS S3 or Azure Blob Storage. The plan is to let another process handle the forwarding. A new file record is created under the specified folder.",
       "endpoint"   : "upload-file/<int:folder_id>/",
       "method"     : "POST",
-      "headers"    : ["Subscription-ID", "Client-Secret" ],
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
       "parameters" : [ { "name" : "Folder ID", "type" : "int" } ],
       "body"       : null,
       "outputs"    : [ { "result" : "success", "file_id" : "file_id" }, { "error" : "Error description" } ],

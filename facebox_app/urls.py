@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, apis
 
 urlpatterns = [
     # Endpoints that renders an HTML page
@@ -39,31 +39,31 @@ urlpatterns = [
     path('search-photo/', views.search_media, name='search_photo'),
     path('search-person/', views.search_person, name='search_person'),
     path('stream-audio/<int:file_id>/', views.stream_audio, name='stream_audio'),
-    # APIs that get information about the datai, create data or modify the data
-    # 'create-folder/<int:parent_id>/'
-    # 'delete-file/<int:file_id>/'
-    # 'delete-folder/<int:folder_id>/'
-    path('get-file-count/<int:folder_id>/', views.get_file_count, name='get_file_count'),
-    path('get-file-position/<int:file_id>/', views.get_file_position, name='get_file_position'),
-    path('merge-persons/<int:person_id>/', views.merge_persons, name='merge_persons'),
+    # APIs that get information about the data, create data or modify the data
+    path('create-folder/<int:parent_id>/', apis.create_folder, name='create_folder'),
+    path('delete-file/<int:file_id>/', apis.delete_file, name='delete_file'),
+    path('delete-folder/<int:folder_id>/', apis.delete_folder, name='delete_folder'),
+    path('get-file-count/<int:folder_id>/', apis.get_file_count, name='get_file_count'),
+    path('get-file-position/<int:file_id>/', apis.get_file_position, name='get_file_position'),
+    path('merge-persons/<int:person_id>/', apis.merge_persons, name='merge_persons'),
     # 'move-file/<int:file_id>/<int:target_folder>/'
     # 'move-folder/<int:folder_id>/<int:target_folder>/'
-    path('refresh-folder-stats/<int:folder_id>/', views.refresh_folder_stats, name='refresh_folder_stats'),
+    path('refresh-folder-stats/<int:folder_id>/', apis.refresh_folder_stats, name='refresh_folder_stats'),
     # 'rename-file/<int:file_id>/<str:name>/'
     # 'rename-folder/<int:folder_id>/<str:name>/'
-    # 'restore-file/<int:file_id>/'
-    # 'restore-folder/<int:folder_id>/'
-    # 'set-file-group/<int:file_id>/<str:group_name>/'
-    # 'set-file-owner/<int:file_id>/<str:owner_name>/'
-    # 'set-file-permission/<int:file_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/'
-    # 'set-folder-group/<int:folder_id>/<str:group_name>/'
-    # 'set-folder-owner/<int:folder_id>/<str:owner_name>/'
-    # 'set-folder-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/'
-    path('unlink-faces/<int:person_id>/', views.unlink_faces, name='unlink_faces'),
-    path('update-file/<int:file_id>/', views.update_file, name='update_file'),
-    # 'update-folder/<int:folder_id>/'
-    path('update-person/<int:person_id>/', views.update_person, name='update_person'),
-    path('update-transcript-segment/<int:file_id>/', views.update_transcript_segment, name='update_transcript_segment'),
+    path('restore-file/<int:file_id>/', apis.restore_file, name='restore_file'),
+    path('restore-folder/<int:folder_id>/', apis.restore_folder, name='restore_folder'),
+    path('set-file-group/<int:file_id>/<str:group_name>/', apis.set_file_group, name='set_file_group'),
+    path('set-file-owner/<int:file_id>/<str:owner_name>/', apis.set_file_owner, name='set_file_owner'),
+    path('set-file-permission/<int:file_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/', apis.set_file_permission, name='set_file_permission'),
+    path('set-folder-group/<int:folder_id>/<str:group_name>/', apis.set_folder_group, name='set_folder_group'),
+    path('set-folder-owner/<int:folder_id>/<str:owner_name>/', apis.set_folder_owner, name='set_folder_owner'),
+    path('set-folder-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/', apis.set_folder_permission, name='set_folder_permission'),
+    path('unlink-faces/<int:person_id>/', apis.unlink_faces, name='unlink_faces'),
+    path('update-file/<int:file_id>/', apis.update_file, name='update_file'),
+    path('update-folder/<int:folder_id>/', apis.update_folder, name='update_folder'),
+    path('update-person/<int:person_id>/', apis.update_person, name='update_person'),
+    path('update-transcript-segment/<int:file_id>/', apis.update_transcript_segment, name='update_transcript_segment'),
     # 'upload-file/<int:folder_id>/'
 ]
 

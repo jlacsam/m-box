@@ -9,30 +9,31 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1200px;
+            max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
         }
         .container {
             background-color: white;
-            padding: 20px;
+            padding: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         h1 {
             color: #333;
             text-align: center;
-            margin-bottom: 30px;
+            margin-top: 10px;
+            margin-bottom: 15px;
         }
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 0px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
         label {
-            min-width: 150px;
+            min-width: 120px;
             font-weight: bold;
             margin: 0;
         }
@@ -44,14 +45,14 @@
             box-sizing: border-box;
         }
         .parameter-group {
-            padding: 15px;
-            margin: 5px 0;
+            padding: 10px;
+            margin-bottom: 10px;
             background-color: #f8f9fa;
             border-radius: 4px;
         }
         .parameter-group h3 {
             margin-top: 0;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
         }
         button {
             background-color: #007bff;
@@ -66,22 +67,22 @@
             background-color: #0056b3;
         }
         .request {
-            margin-top: 20px;
-            padding: 15px;
+            margin-top: 10px;
+            padding: 10px;
             background-color: #f8f9fa;
             border-radius: 4px;
             white-space: pre-wrap;
         }
         .response {
-            margin-top: 20px;
-            padding: 15px;
+            margin-top: 10px;
+            padding: 10px;
             background-color: #f8f9fa;
             border-radius: 4px;
             white-space: pre-wrap;
         }
         .api-info {
-            margin: 20px 0;
-            padding: 15px;
+            margin: 10px 0;
+            padding: 10px;
             background-color: #e9ecef;
             border-radius: 4px;
         }
@@ -114,26 +115,12 @@
         <h1>m-box REST APIs</h1>
 
         <div class="parameter-group">
-            <h3>Common Headers</h3>
+            <h3>Select API</h3>
             <div class="form-group">
-                <label for="csrfToken">CSRF Token</label>
-                <input type="text" id="csrfToken" required>
+                <select id="apiSelect">
+                    <option value="">Loading APIs...</option>
+                </select>
             </div>
-            <div class="form-group">
-                <label for="subscriptionID">Subscription-ID</label>
-                <input type="text" id="subscriptionID" required>
-            </div>
-            <div class="form-group">
-                <label for="clientSecret">Client-Secret</label>
-                <input type="text" id="clientSecret" required>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="apiSelect">Select API</label>
-            <select id="apiSelect">
-                <option value="">Loading APIs...</option>
-            </select>
         </div>
 
         <div id="apiDetails" class="api-info" style="display: none;">
@@ -142,6 +129,18 @@
             <div id="method"></div>
             <div id="outputs"></div>
             <div id="status"></div>
+        </div>
+
+        <div class="parameter-group">
+            <h3>Common Headers</h3>
+            <div class="form-group">
+                <label for="csrfToken">CSRF Token</label>
+                <input type="text" id="csrfToken" required>
+                <label for="subscriptionID">Subscription-ID</label>
+                <input type="text" id="subscriptionID" required>
+                <label for="clientSecret">Client-Secret</label>
+                <input type="text" id="clientSecret" required>
+            </div>
         </div>
 
         <div id="headerParams" class="parameter-group"></div>
@@ -265,63 +264,100 @@
             } else {
                 bodySection.style.display = 'none';
             }
+
+            // Hide request and response sections
+            document.getElementById('request').style.display = 'none';
+            document.getElementById('response').style.display = 'none';
         }
 
-        function submitRequest() {
-            const selectedApi = apiData[document.getElementById('apiSelect').value];
-            if (!selectedApi) return;
+function submitRequest() {
+    const selectedApi = apiData[document.getElementById('apiSelect').value];
+    if (!selectedApi) return;
 
-            // Collect headers
-            const headers = {};
-            headers['X-CSRF-Token'] = document.getElementById('csrfToken').value;
-            headers['Subscription-ID'] = document.getElementById('subscriptionID').value;
-            headers['Client-Secret'] = document.getElementById('clientSecret').value;
-            selectedApi.headers.forEach(header => {
-                if (!commonHeaders.includes(header)) {
-                    headers[header] = document.getElementById(`header_${header}`).value;
-                }
-            });
+    // Collect headers
+    const headers = {
+        'X-CSRF-Token': document.getElementById('csrfToken').value,
+        'Subscription-ID': document.getElementById('subscriptionID').value,
+        'Client-Secret': document.getElementById('clientSecret').value
+    };
 
-            // Build endpoint URL by replacing parameters
-            let endpoint = selectedApi.endpoint.split('/')[0];
-            selectedApi.parameters.forEach(param => {
-                const value = document.getElementById(`param_${param.name}`).value;
-                const placeholder = `<int:${param.name.toLowerCase().replace(' ', '_')}>`;
-                endpoint = endpoint.replace(placeholder, value);
-            });
+    // Add Content-Type for requests with body
+    if (selectedApi.body) {
+        headers['Content-Type'] = 'application/json';
+    }
 
-            // Collect body if needed
-            const body = selectedApi.body ? 
-                document.getElementById('requestBody').value : null;
-
-            // Display what would be sent
-            const requestDetails = {
-                method: selectedApi.method,
-                endpoint: endpoint,
-                headers: headers,
-                body: body ? JSON.parse(body) : null
-            };
-            document.getElementById('request').style.display = 'block';
-            document.getElementById('request').innerHTML = 
-                `<h3>Request Details:</h3>` +
-                `<pre>${JSON.stringify(requestDetails, null, 2)}</pre>`;
-
-            // Fetch endpoint
-            fetch('/api/' + endpoint + '/', requestDetails)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('response').style.display = 'block';
-                document.getElementById('response').innerHTML = 
-                    `<h3>Response:</h3>` +
-                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            })
-            .catch(error => {
-                document.getElementById('response').style.display = 'block';
-                document.getElementById('response').innerHTML = 
-                    `<h3>Error:</h3>` +
-                    `<pre>${error}</pre>`;
-            });
+    // Add custom headers
+    selectedApi.headers.forEach(header => {
+        if (!commonHeaders.includes(header)) {
+            headers[header] = document.getElementById(`header_${header}`).value;
         }
+    });
+
+    // Build endpoint URL by replacing parameters
+    let endpoint = selectedApi.endpoint;
+    selectedApi.parameters.forEach(param => {
+        const value = document.getElementById(`param_${param.name}`).value;
+        console.log(value);
+        const placeholder = `<${param.type.toLowerCase()}:${param.name.toLowerCase().replace(' ', '_')}>`;
+        endpoint = endpoint.replace(placeholder, value);
+    });
+
+    // Prepare fetch options
+    const fetchOptions = {
+        method: selectedApi.method,
+        headers: headers,
+        credentials: 'include' // This is important for CSRF token
+    };
+
+    // Add body if needed
+    if (selectedApi.body) {
+        try {
+            const bodyContent = document.getElementById('requestBody').value;
+            fetchOptions.body = bodyContent.trim();
+        } catch (error) {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Error:</h3><pre>Invalid JSON in request body: ${error.message}</pre>`;
+            return;
+        }
+    }
+
+    // Display what would be sent
+    const requestDetails = {
+        method: selectedApi.method,
+        endpoint: endpoint,
+        headers: headers,
+        body: selectedApi.body ? JSON.parse(document.getElementById('requestBody').value) : null
+    };
+
+    document.getElementById('request').style.display = 'block';
+    document.getElementById('request').innerHTML = 
+        `<h3>Request Details:</h3>` +
+        `<pre>${JSON.stringify(requestDetails, null, 2)}</pre>`;
+
+    // Make the API call
+    fetch('/api/' + endpoint, fetchOptions)
+        .then(response => {
+            if (!response.ok) {
+                return Promise.all([response.json(), response]).then(([data, response]) => {
+                    throw new Error(`${response.status}:${response.statusText}:${JSON.stringify(data)}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Response:</h3>` +
+                `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        })
+        .catch(error => {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Error:</h3>` +
+                `<pre>${error.message}</pre>`;
+        });
+}
     </script>
 </body>
 </html>
