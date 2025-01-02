@@ -114,18 +114,6 @@
         .textarea-container textarea {
             flex: 1;
         }
-        .file-input-container {
-            margin: 10px 0;
-        }
-        .file-input-container label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .file-details {
-            margin-top: 5px;
-            font-size: 0.9em;
-            color: #666;
-        }
     </style>
 </head>
 <body>
@@ -163,15 +151,13 @@
 
         <div id="headerParams" class="parameter-group"></div>
         <div id="urlParams" class="parameter-group"></div>
+        <div id="bodySection" class="parameter-group"></div>
 
-    <div id="bodySection" class="parameter-group">
-        <!-- This section will be dynamically updated based on content type -->
+        <button id="submitBtn" onclick="submitRequest()">Submit</button>
+
+        <div id="request" class="request" style="display: none;"></div>
+        <div id="response" class="response" style="display: none;"></div>
     </div>
-
-    <button id="submitBtn" onclick="submitRequest()">Submit</button>
-
-    <div id="request" class="request" style="display: none;"></div>
-    <div id="response" class="response" style="display: none;"></div>
 
     <script src="{% static 'js/utils.js' %}"></script>
     <script>
@@ -270,42 +256,16 @@
                 `;
             });
 
-            // Update body section based on content type
+            // Update body section
             const bodySection = document.getElementById('bodySection');
             if (selectedApi.body) {
-                const contentType = selectedApi.body.content_type || 'application/json';
-                
-                if (contentType === 'multipart/form-data') {
-                    bodySection.innerHTML = `
-                        <h3>File Upload</h3>
-                        <div class="file-input-container">
-                            <label for="fileInput">Select File</label>
-                            <input type="file" id="fileInput" required>
-                            <div id="fileDetails" class="file-details"></div>
-                        </div>
-                    `;
-                    
-                    // Add file input change listener
-                    document.getElementById('fileInput').addEventListener('change', function(e) {
-                        const file = e.target.files[0];
-                        if (file) {
-                            document.getElementById('fileDetails').innerHTML = `
-                                Selected file: ${file.name}<br>
-                                Size: ${(file.size / 1024).toFixed(2)} KB<br>
-                                Type: ${file.type}
-                            `;
-                        }
-                    });
-                } else {
-                    // Default JSON body handling
-                    bodySection.innerHTML = `
-                        <h3>Request Body</h3>
-                        <div class="textarea-container">
-                            <label for="requestBody">Body</label>
-                            <textarea id="requestBody" rows="5">${JSON.stringify(selectedApi.body, null, 2)}</textarea>
-                        </div>
-                    `;
-                }
+                bodySection.innerHTML = `
+                    <h3>Request Body</h3>
+                    <div class="textarea-container">
+                        <label for="requestBody">Body</label>
+                        <textarea id="requestBody" rows="5">${JSON.stringify(selectedApi.body, null, 2)}</textarea>
+                    </div>
+                `;
                 bodySection.style.display = 'block';
             } else {
                 bodySection.style.display = 'none';
@@ -316,124 +276,94 @@
             document.getElementById('response').style.display = 'none';
         }
 
-        function submitRequest() {
-            const selectedApi = apiData[document.getElementById('apiSelect').value];
-            if (!selectedApi) return;
+function submitRequest() {
+    const selectedApi = apiData[document.getElementById('apiSelect').value];
+    if (!selectedApi) return;
 
-            // Collect headers
-            const headers = {
-                'X-CSRFToken': document.getElementById('csrfToken').value,
-                'Subscription-ID': document.getElementById('subscriptionID').value,
-                'Client-Secret': document.getElementById('clientSecret').value
-            };
+    // Collect headers
+    const headers = {
+        'X-CSRFToken': document.getElementById('csrfToken').value,
+        'Subscription-ID': document.getElementById('subscriptionID').value,
+        'Client-Secret': document.getElementById('clientSecret').value
+    };
 
-            // Build endpoint URL
-            let endpoint = selectedApi.endpoint;
-            selectedApi.parameters.forEach(param => {
-                const value = document.getElementById(`param_${param.name}`).value;
-                const placeholder = `<${param.type.toLowerCase()}:${param.name.toLowerCase().replace(/ /g, '_')}>`;
-                endpoint = endpoint.replace(placeholder, value);
-            });
+    // Add Content-Type for requests with body
+    if (selectedApi.body) {
+        headers['Content-Type'] = 'application/json';
+    }
 
-            // Add custom headers
-            selectedApi.headers.forEach(header => {
-                if (!commonHeaders.includes(header)) {
-                    headers[header] = document.getElementById(`header_${header}`).value;
-                }
-            });
-
-            // Prepare fetch options
-            const fetchOptions = {
-                method: selectedApi.method,
-                headers: headers,
-                credentials: 'include'
-            };
-
-            // Handle different content types
-            if (selectedApi.body) {
-                const contentType = selectedApi.body.content_type || 'application/json';
-                
-                if (contentType === 'multipart/form-data') {
-                    const formData = new FormData();
-                    const fileInput = document.getElementById('fileInput');
-                    
-                    if (fileInput.files.length > 0) {
-                        formData.append('file', fileInput.files[0]);
-                        // Don't set Content-Type header - browser will set it with boundary
-                        delete headers['Content-Type'];
-                        fetchOptions.body = formData;
-                    } else {
-                        document.getElementById('response').style.display = 'block';
-                        document.getElementById('response').innerHTML = 
-                            `<h3>Error:</h3><pre>Please select a file to upload</pre>`;
-                        return;
-                    }
-                } else {
-                    // Handle JSON body
-                    headers['Content-Type'] = 'application/json';
-                    try {
-                        const bodyContent = document.getElementById('requestBody').value;
-                        fetchOptions.body = bodyContent.trim();
-                    } catch (error) {
-                        document.getElementById('response').style.display = 'block';
-                        document.getElementById('response').innerHTML = 
-                            `<h3>Error:</h3><pre>Invalid JSON in request body: ${error.message}</pre>`;
-                        return;
-                    }
-                }
-            }
-
-            fetchOptions.headers = headers;
-
-            // Display request details
-            const requestDetails = {
-                method: selectedApi.method,
-                endpoint: endpoint,
-                headers: headers
-            };
-
-            if (selectedApi.body && selectedApi.body.content_type === 'multipart/form-data') {
-                const fileInput = document.getElementById('fileInput');
-                if (fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    requestDetails.file = {
-                        name: file.name,
-                        size: file.size,
-                        type: file.type
-                    };
-                }
-            } else if (selectedApi.body) {
-                requestDetails.body = JSON.parse(document.getElementById('requestBody').value);
-            }
-
-            document.getElementById('request').style.display = 'block';
-            document.getElementById('request').innerHTML = 
-                `<h3>Request Details:</h3>` +
-                `<pre>${JSON.stringify(requestDetails, null, 2)}</pre>`;
-
-            // Make the API call
-            fetch('/api/' + endpoint, fetchOptions)
-                .then(response => {
-                    if (!response.ok) {
-                        return Promise.all([response.json(), response]).then(([data, response]) => {
-                            throw new Error(`${response.status}:${response.statusText}:${JSON.stringify(data)}`);
-                        });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    document.getElementById('response').style.display = 'block';
-                    document.getElementById('response').innerHTML = 
-                        `<h3>Response:</h3>` +
-                        `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                })
-                .catch(error => {
-                    document.getElementById('response').style.display = 'block';
-                    document.getElementById('response').innerHTML = 
-                        `<h3>Error:</h3>` +
-                        `<pre>${error.message}</pre>`;
-                });
+    // Add custom headers
+    selectedApi.headers.forEach(header => {
+        if (!commonHeaders.includes(header)) {
+            headers[header] = document.getElementById(`header_${header}`).value;
         }
+    });
+
+    // Build endpoint URL by replacing parameters
+    let endpoint = selectedApi.endpoint;
+    selectedApi.parameters.forEach(param => {
+        const value = document.getElementById(`param_${param.name}`).value;
+        const placeholder = `<${param.type.toLowerCase()}:${param.name.toLowerCase().replace(/ /g, '_')}>`;
+        endpoint = endpoint.replace(placeholder, value);
+        console.log(endpoint,placeholder);
+    });
+
+    // Prepare fetch options
+    const fetchOptions = {
+        method: selectedApi.method,
+        headers: headers,
+        credentials: 'include' // This is important for CSRF token
+    };
+
+    // Add body if needed
+    if (selectedApi.body) {
+        try {
+            const bodyContent = document.getElementById('requestBody').value;
+            fetchOptions.body = bodyContent.trim();
+        } catch (error) {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Error:</h3><pre>Invalid JSON in request body: ${error.message}</pre>`;
+            return;
+        }
+    }
+
+    // Display what would be sent
+    const requestDetails = {
+        method: selectedApi.method,
+        endpoint: endpoint,
+        headers: headers,
+        body: selectedApi.body ? JSON.parse(document.getElementById('requestBody').value) : null
+    };
+
+    document.getElementById('request').style.display = 'block';
+    document.getElementById('request').innerHTML = 
+        `<h3>Request Details:</h3>` +
+        `<pre>${JSON.stringify(requestDetails, null, 2)}</pre>`;
+
+    // Make the API call
+    fetch('/api/' + endpoint, fetchOptions)
+        .then(response => {
+            if (!response.ok) {
+                return Promise.all([response.json(), response]).then(([data, response]) => {
+                    throw new Error(`${response.status}:${response.statusText}:${JSON.stringify(data)}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Response:</h3>` +
+                `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        })
+        .catch(error => {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response').innerHTML = 
+                `<h3>Error:</h3>` +
+                `<pre>${error.message}</pre>`;
+        });
+}
     </script>
 </body>
 </html>

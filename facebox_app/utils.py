@@ -6,8 +6,9 @@ from keras_facenet import FaceNet
 from mtcnn import MTCNN
 from PIL import Image
 from pydub import AudioSegment
-from .models import FbxFile, FbxFolder
+from .models import FbxFile, FbxFolder, FbxAudit
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 # Initialize FaceNet model and MTCNN detector
 facenet = FaceNet()
@@ -148,7 +149,7 @@ def check_folder_permission(request,folder_id,action):
             if folder.owner_rights & 4 and folder.owner_rights & 1:
                 return True
 
-    if action == 'update' or action == 'rename' or action == 'add': # Update metadata, rename or add folder/file
+    if action in [ 'update', 'rename', 'add' ]: # Update metadata, rename or add folder/file
         if folder.public_rights & 2 and folder.public_rights & 1: # -wx
             return True
         if user: # User exists in the domain
@@ -166,7 +167,7 @@ def check_folder_permission(request,folder_id,action):
             if folder.owner_rights & 2 and folder.owner_rights & 1:
                 return True
 
-    if action == 'delete' or action == 'restore':
+    if action in [ 'delete', 'restore' ]: # Delete or restore the folder
         parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
         if parent.public_rights & 2 and parent.public_rights & 1 and \
             folder.public_rights & 2 and folder.public_rights & 1: # -wx
@@ -295,7 +296,8 @@ def check_file_permission(request,file_id,action):
 
     return False
 
-# Insert audit record ##########################################################
+
+# Insert audit record ##############################################################################
 def insert_audit(username,activity,table_name,record_id,old_data,new_data,location):
     try:
         audit = FbxAudit(
@@ -312,20 +314,27 @@ def insert_audit(username,activity,table_name,record_id,old_data,new_data,locati
     except Exception as e:
         print(f"Error occurred: {e}")
 
-def update_last_accessed(file_id):
+
+# Update last accessed of either folder or file record #############################################
+def update_last_accessed(record_id,target='file'):
     try:
-        row = get_object_or_404(FbxFile, file_id=file_id)
+        if target == 'folder':
+            row = get_object_or_404(FbxFolder, folder_id=record_id)
+        else:
+            row = get_object_or_404(FbxFile, file_id=record_id)
         row.last_accessed = timezone.now()
         row.save()
     except Exception as e:
         print(f"Error occurred: {e}")
 
-def update_last_modified(file_id,target='file'):
+
+# Update last modified of either folder or file record #############################################
+def update_last_modified(record_id,target='file'):
     try:
         if target == 'folder':
-            row = get_object_or_404(FbxFolder, folder_id=folder_id)
+            row = get_object_or_404(FbxFolder, folder_id=record_id)
         else:
-            row = get_object_or_404(FbxFile, file_id=file_id)
+            row = get_object_or_404(FbxFile, file_id=record_id)
         row.last_modified = timezone.now()
         row.save()
     except Exception as e:

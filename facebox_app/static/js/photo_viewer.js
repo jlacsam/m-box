@@ -218,6 +218,7 @@ function updateFile() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(pair)
     })
@@ -751,6 +752,7 @@ function checkNextPhoto() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(pair)
     })

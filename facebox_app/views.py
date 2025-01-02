@@ -15,16 +15,14 @@ from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse, FileResponse, HttpResponse, StreamingHttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.utils import timezone
 
 from azure.storage.blob import BlobServiceClient
 
 from .utils import get_face_embedding, get_voice_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed
-from .models import FbxPerson, FbxFace, FbxFile, FbxThumbnail, FbxAudit, FbxFolder
+from .models import FbxFace, FbxFile, FbxThumbnail, FbxFolder
 
 
 # Search the mbox_face table ########################################################################
@@ -565,7 +563,7 @@ def get_recycle_bin(request):
     media_type = request.headers.get('Media-Type')
 
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return JsonResponse({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     offset = 0
     if start_from is not None:
@@ -695,7 +693,8 @@ def get_media(request, file_id):
     cursor.close()
 
     # Update the last_accessed field 
-    update_last_accessed(file_id)
+    if len(rows):
+        update_last_accessed(file_id)
 
     # Serialize the results and return the response
     if len(rows):
@@ -812,6 +811,10 @@ def get_folder(request, folder_id):
     # Close database connection
     cursor.close()
 
+    # Update the last_accessed field
+    if len(rows): 
+        update_last_accessed(folder_id,'folder')
+
     # Serialize the results and return the response
     if len(rows):
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
@@ -860,6 +863,10 @@ def get_folders(request, parent_id):
 
     # Close database connection
     cursor.close()
+
+    # Update the last_accessed field
+    if len(rows): 
+        update_last_accessed(parent_id,'folder')
 
     # Serialize the results and return the response
     if len(rows):
@@ -984,6 +991,10 @@ def get_transcript(request,file_id):
 
     # Close cursor
     cursor.close()
+
+    # Update the last_accessed field
+    if len(rows): 
+        update_last_accessed(file_id,'file')
 
     if len(rows):
         return Response({'transcript': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
@@ -1120,6 +1131,10 @@ def get_diary(request,file_id):
 
     # Close database connection
     cursor.close()
+
+    # Update the last_accessed field
+    if len(rows): 
+        update_last_accessed(file_id,'file')
 
     # Serialize the results and return the response
     if len(rows):
@@ -1321,6 +1336,9 @@ def stream_audio(request, file_id):
         stream = blob_client.download_blob(offset=offset)
         for chunk in stream.chunks():
             yield chunk
+
+    # Update the last_accessed field
+    update_last_accessed(file_id,'file')
 
     # Return the StreamingHttpResponse with the appropriate content
     response = StreamingHttpResponse(

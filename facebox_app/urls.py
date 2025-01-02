@@ -46,11 +46,11 @@ urlpatterns = [
     path('get-file-count/<int:folder_id>/', apis.get_file_count, name='get_file_count'),
     path('get-file-position/<int:file_id>/', apis.get_file_position, name='get_file_position'),
     path('merge-persons/<int:person_id>/', apis.merge_persons, name='merge_persons'),
-    # 'move-file/<int:file_id>/<int:target_folder>/'
-    # 'move-folder/<int:folder_id>/<int:target_folder>/'
+    path('move-file/<int:file_id>/<int:target_folder>/', apis.move_file, name='move_file'),
+    path('move-folder/<int:folder_id>/<int:target_folder>/', apis.move_folder, name='move_folder'),
     path('refresh-folder-stats/<int:folder_id>/', apis.refresh_folder_stats, name='refresh_folder_stats'),
-    # 'rename-file/<int:file_id>/<str:name>/'
-    # 'rename-folder/<int:folder_id>/<str:name>/'
+    path('rename-file/<int:file_id>/', apis.rename_file, name='rename_file'),
+    path('rename-folder/<int:folder_id>/', apis.rename_folder, name='rename_folder'),
     path('restore-file/<int:file_id>/', apis.restore_file, name='restore_file'),
     path('restore-folder/<int:folder_id>/', apis.restore_folder, name='restore_folder'),
     path('set-file-group/<int:file_id>/<str:group_name>/', apis.set_file_group, name='set_file_group'),
@@ -64,6 +64,6 @@ urlpatterns = [
     path('update-folder/<int:folder_id>/', apis.update_folder, name='update_folder'),
     path('update-person/<int:person_id>/', apis.update_person, name='update_person'),
     path('update-transcript-segment/<int:file_id>/', apis.update_transcript_segment, name='update_transcript_segment'),
-    # 'upload-file/<int:folder_id>/'
+    path('upload-file/<int:folder_id>/', apis.upload_file, name='upload_file')
 ]
 

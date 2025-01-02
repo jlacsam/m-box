@@ -765,6 +765,7 @@ function saveEdits() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(person)
     })

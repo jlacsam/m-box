@@ -23,6 +23,7 @@ env/
 # Static and media files
 staticfiles/
 media/
+uploads/
 
 # VSCode settings
 .vscode/

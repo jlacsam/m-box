@@ -150,6 +150,10 @@ MEDIA_ROOT = os.environ.get('MBOX_MEDIA_ROOT')
 if not MEDIA_ROOT:
     MEDIA_ROOT = '/mbox/thumbnails/'
 
+UPLOADS_DIRECTORY = os.environ.get('MBOX_UPLOADS_DIRECTORY')
+if not UPLOADS_DIRECTORY:
+    UPLOADS_DIRECTORY = '/mbox/uploads/'
+
 LOG_DIRECTORY = os.environ.get('MBOX_LOG_DIRECTORY')
 if not LOG_DIRECTORY:
     LOG_DIRECTORY = '/mbox/logs/'
