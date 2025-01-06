@@ -27,7 +27,8 @@ def create_folder(request,parent_id):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,parent_id,'add'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         data = request.data 
@@ -71,22 +72,13 @@ def rename_folder(request,folder_id):
     client_secret = request.headers.get('Client-Secret')
 
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
+        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
                         status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to update the folder record
     if not check_folder_permission(request,folder_id,'rename'):
-        return Response({'error':'Permission denied.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions on the folder are required.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
     try:
@@ -129,19 +121,9 @@ def rename_file(request,file_id):
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'rename'):
-        return Response({'error':'Permission denied.'},
+        return Response({'error':'Permission denied. Write permission on the file is required.'},
                             status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
@@ -171,7 +153,8 @@ def set_folder_owner(request,folder_id,owner_name):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_owner'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the ownership of a folder.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
 
@@ -207,7 +190,8 @@ def set_file_owner(request,file_id,owner_name):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_owner'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the owner of a file.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
 
@@ -243,7 +227,8 @@ def set_folder_group(request,folder_id,group_name):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_group'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the group of a folder.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
 
@@ -276,7 +261,8 @@ def set_file_group(request,file_id,group_name):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_group'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the group of a file.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
 
@@ -318,7 +304,8 @@ def set_folder_permission(request,folder_id,owner_rights,group_rights,domain_rig
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_permission'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the permissions of a folder.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if owner_rights > 7 or group_rights > 7 or domain_rights > 7 or public_rights > 7:
         return Response({'error':'Invalid value(s)'}, status=status.HTTP_400_BAD_REQUEST)
@@ -359,7 +346,8 @@ def set_file_permission(request,file_id,owner_rights,group_rights,domain_rights,
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_permission'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Only the owner and administrator ' \
+                        'can change the permissions of a file.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if owner_rights > 7 or group_rights > 7 or domain_rights > 7 or public_rights > 7:
         return Response({'error':'Invalid value(s)'}, status=status.HTTP_400_BAD_REQUEST)
@@ -401,8 +389,13 @@ def unlink_faces(request, person_id):
 
     # Check if user is a member of the editors group
     groups = request.user.groups.all()
+    if not groups:
+        return Response({'error': 'User is not allowed to perform database updates.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
+
     if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'User is not allowed to perform database updates.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     faces_list = request.data
     if not isinstance(faces_list, list) or not all(isinstance(i, int) for i in faces_list):
@@ -435,29 +428,19 @@ def move_folder(request,folder_id,target_folder):
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
     old_parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
     new_parent = get_object_or_404(FbxFolder, folder_id=target_folder)
 
     # Check if the user has permission to remove the folder from its parent
-    if not check_folder_permission(request,folder_id,'delete'):
-        return Response({'error':'Permission denied.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+    if not check_folder_permission(request,folder.parent_id,'delete'):
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the parent folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to add the folder to the new parent
     if not check_folder_permission(request,target_folder,'add'):
-        return Response({'error':'Permission denied.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the target folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         old_path_name = folder.path_name
@@ -501,13 +484,13 @@ def move_file(request,file_id,target_folder):
 
     # Check if the user has permission to remove the file from the source folder
     if not check_folder_permission(request,file_id,'delete'):
-        return Response({'error':'Permission denied.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the source folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to add the file to the target folder
     if not check_folder_permission(request,target_folder,'add'):
-        return Response({'error':'Permission denied.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the target folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         file.folder_id = target_folder
@@ -564,7 +547,8 @@ def delete_folder(request,folder_id):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'delete'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the parent folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     query = "SELECT COUNT(*) FROM mbox_file WHERE folder_id = %s AND NOT is_deleted"
     with connection.cursor() as cursor:
@@ -610,7 +594,8 @@ def delete_file(request,file_id):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'delete'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
 
@@ -683,13 +668,17 @@ def merge_persons(request, person_id):
 
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if user is a member of the editors group
     groups = request.user.groups.all()
+    if not groups:
+        return Response({'error': 'User is not allowed to perform database updates.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
+
     if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
         return Response({'error': 'User is not allowed to perform database updates.'},
-                            status=status.HTTP_401_UNAUTHORIZED)
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     persons_list = request.data
     if not isinstance(persons_list, list) or not all(isinstance(i, int) for i in persons_list):
@@ -737,7 +726,8 @@ def restore_folder(request,folder_id):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'restore'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the parent folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
 
@@ -774,7 +764,8 @@ def restore_file(request,file_id):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'restore'):
-        return Response({'error':'Permission denied.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
 
@@ -810,7 +801,11 @@ def upload_file(request,folder_id):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-    # TO DO check permissions
+    # Check if the user has permission to add a file to the folder
+    if not check_folder_permission(request,folder_id,'add'):
+        return Response({'error':'Permission denied. Write permission on the folder is required.'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
 
     if 'file' not in request.FILES:
         return Response({'error':'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -890,16 +885,6 @@ def update_file(request, file_id):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'update'):
         return Response({'error':'Permission denied.'},
@@ -965,16 +950,6 @@ def update_folder(request,folder_id):
     # Check if client app has a valid subscription
     if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, 
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
                         status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to do an update on the folder
@@ -1106,19 +1081,9 @@ def update_transcript_segment(request, file_id):
         return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-    # Check if user is a member of the editors group
-    groups = request.user.groups.all()
-    if not groups:
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    if not groups.filter(name=settings.MBOX_EDITORS_GROUP).exists():
-        return Response({'error': 'User is not allowed to perform database updates.'},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'update'):
-        return Response({'error':'Permission denied.'},
+        return Response({'error':'Permission denied. Write permission on the file is required.'},
                             status=status.HTTP_401_UNAUTHORIZED)
 
     try:

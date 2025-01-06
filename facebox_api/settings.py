@@ -89,6 +89,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'facebox_api.wsgi.application'
 
+FILE_UPLOAD_HANDLERS = [
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024  # 8MB
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
@@ -219,6 +225,17 @@ LOGIN_REDIRECT_URL = '/app/videos/'
 LOGGING = {
        'version': 1,
        'disable_existing_loggers': False,
+       'formatters': {
+            'verbose': {
+                'format': '[{asctime}] {levelname} {name} {message}',
+                'style': '{',
+                'datefmt': '%Y-%m-%d %H:%M:%S',
+            },
+            'simple': {
+                'format': '{levelname} {message}',
+                'style': '{',
+            },
+       },
        'handlers': {
            'file': {
                'level': 'INFO',
@@ -226,6 +243,7 @@ LOGGING = {
                'filename': LOG_DIRECTORY + 'django.log',
                'maxBytes': LOG_SIZE,
                'backupCount': 10,
+               'formatter': 'verbose',
            },
            'mail_admins': {
                'level': 'ERROR',
