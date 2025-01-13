@@ -470,6 +470,6 @@ function replaceRow(folder) {
     cols[6].innerHTML = folder.video_count;
     cols[7].innerHTML = folder.audio_count;
     cols[8].innerHTML = folder.photo_count;
-    cols[9].innerHTML = folder.reviewed_count;
-    cols[10].innerHTML = folder.file_count - folder.reviewed_count;
+    cols[9].innerHTML = folder.file_count - folder.reviewed_count;
+    cols[10].innerHTML = folder.reviewed_count;
 }

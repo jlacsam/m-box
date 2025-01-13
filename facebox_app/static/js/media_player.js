@@ -6,13 +6,14 @@ const INT_MAX = 2147483647;
 const FOLDER_ICON = '\u{1F4C1}';
 const FOLDER_WIDTH = 20;
 
-let selectedFile = 0
-let selectedFolder = 0
+let selectedFile = 0;
+let selectedFolder = 0;
 let editorDiv = null;
 let editorText = null;
 let editorSelect = null;
 let totalFiles = 0;
 let maxRows = 10;
+let selectedFileName = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     const videosTab = document.getElementById('videos-tab');
@@ -255,6 +256,7 @@ function updateFile() {
     fetch(`/api/update-file/${selectedFile}/`, {
         method: 'PATCH',
         headers: {
+            'Content-Type': 'application/json',
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
@@ -300,6 +302,7 @@ function getMedia(file_id) {
             if (data.results.length > 0) {
                 selectedFile = data.results[0].file_id;
                 selectedFolder = data.results[0].folder_id;
+                selectedFileName = data.results[0].file_name;
                 showDetails(data.results[0]);
                 showMedia(data.results[0]);
                 showTranscript(file_id);
@@ -345,6 +348,7 @@ function updateTranscript() {
     fetch(`/api/update-transcript-segment/${q_file_id}/`, {
         method: 'PATCH',
         headers: {
+            'Content-Type': 'application/json',
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
@@ -979,8 +983,9 @@ document.getElementById('download-transcript').addEventListener('click', functio
     const blob = new Blob([cleanedText], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const lastDot = selectedFileName.lastIndexOf('.');
     a.href = url;
-    a.download = 'transcript.txt';
+    a.download = selectedFileName.substring(0,lastDot) + '_transcript.txt';
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

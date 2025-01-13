@@ -901,7 +901,8 @@ def update_file(request, file_id):
         # Check if the field being updated is allowed
         allowed_fields = ['extension','media_type','media_source','description','tags','texts','remarks',
                           'attributes','extra_data','people','places','title','creator','subject',
-                          'publisher','contributor','identifier','language','relation','coverage','rights']
+                          'publisher','contributor','identifier','language','relation','coverage',
+                          'rights','status']
         for field, value in data.items():
             if not field in allowed_fields:
                 return Response({'error':f'{field} is not an editable field.'},
