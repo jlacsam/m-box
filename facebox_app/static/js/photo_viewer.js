@@ -218,7 +218,6 @@ function updateFile() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json',
         },
         body: JSON.stringify(pair)
     })
@@ -458,6 +457,7 @@ function getFilePosition(file_id,folder_id) {
 }
 
 function showMedia(data) {
+    console.log(data)
     const photoViewer = document.getElementById('photo-viewer');
     photoViewer.src = '';
     photoViewer.src = data.file_url;
@@ -469,6 +469,15 @@ function showDetails(data) {
     document.getElementById('detail-file-id').innerHTML = '(ID:' + data.file_id + ')';
     document.getElementById('detail-file-type').innerHTML = data.file_type;
     document.getElementById('detail-media-type').innerHTML = data.media_source;
+    document.getElementById('detail-creator').innerHTML = data.creator;
+    document.getElementById('detail-subject').innerHTML = data.subject;
+    document.getElementById('detail-publisher').innerHTML = data.publisher;
+    document.getElementById('detail-contributor').innerHTML = data.contributor;
+    document.getElementById('detail-language').innerHTML = data.language;
+    document.getElementById('detail-coverage').innerHTML = data.coverage;
+    document.getElementById('detail-relation').innerHTML = data.relation;
+    document.getElementById('detail-rights').innerHTML = data.rights;
+    document.getElementById('detail-identifier').innerHTML = data.identifier;
     document.getElementById('detail-file-size').innerHTML = data.size;
     document.getElementById('detail-created').innerHTML = data.date_created
     document.getElementById('detail-uploaded').innerHTML = data.date_uploaded;
@@ -554,12 +563,60 @@ function displayAudit(results) {
         <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
         <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
         <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
-        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></p>
-        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></p>
-        <hr></td></tr>`;
+        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.new_data, item.old_data)}</pre></p>
+        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.old_data, item.new_data)}</pre></p>
+       <hr></td></tr>`;
     });
 
     auditLog.innerHTML = html;
+}
+
+function highlightJsonChanges(oldData, newData) {
+    const oldObj = typeof oldData === 'string' ? JSON.parse(oldData) : oldData;
+    const newObj = typeof newData === 'string' ? JSON.parse(newData) : newData;
+    
+    function highlightStringDiff(oldStr, newStr) {
+        oldStr = String(oldStr || '');
+        newStr = String(newStr || '');
+        
+        let result = '';
+        let highlightStarted = false;
+        
+        for (let i = 0; i < newStr.length; i++) {
+            if (newStr[i] !== oldStr[i]) {
+                if (!highlightStarted) {
+                    result += '<span style="background-color: #fff3cd">';
+                    highlightStarted = true;
+                }
+            } else {
+                if (highlightStarted) {
+                    result += '</span>';
+                    highlightStarted = false;
+                }
+            }
+            result += newStr[i];
+        }
+        
+        if (highlightStarted) {
+            result += '</span>';
+        }
+        
+        return result;
+    }
+
+    const result = {};
+    Object.keys(newObj).forEach(key => {
+        if (oldObj[key] !== newObj[key]) {
+            result[key] = highlightStringDiff(oldObj[key], newObj[key]);
+        } else {
+            result[key] = newObj[key];
+        }
+    });
+    
+    return JSON.stringify(result, null, 2)
+        .replace(/"<span[^>]*>(.*?)<\/span>"/g, '<span style="background-color: #fff3cd">$1</span>')
+        .replace(/\\n/g, '\n')
+        .replace(/\\/g, '');
 }
 
 function browseFolder(parent_id = 1) {
@@ -752,7 +809,6 @@ function checkNextPhoto() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json',
         },
         body: JSON.stringify(pair)
     })

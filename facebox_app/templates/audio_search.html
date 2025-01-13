@@ -6,6 +6,7 @@
     <title>AudioBox</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/datatables.min.css' %}">
     <link rel="icon" href="{% static 'favicon.ico' %}">
 </head>
 <body>
@@ -64,15 +65,19 @@
                 <button id="top-page" class="paging-button">Top</button>
                 <button id="prev-page" class="paging-button">Previous</button>
                 <button id="next-page" class="paging-button">Next</button>
+                <label class="switch">
+                    <input type="checkbox" id="toggleViewBtn">
+                    <span class="slider-tile"></span>
+                </label>
             </td>
         </tr></table>
     </div>
-
     <div id="results">
         <table id="results-table">
             <thead>
                 <tr>
                     <th>File ID</th>
+                    <th>Title</th>
                     <th>Name</th>
                     <th>File Type</th>
                     <th>Media Source</th>
@@ -91,6 +96,15 @@
                     <th>File Attributes</th>
                     <th>Other Metadata</th>
                     <th>Status</th>
+                    <th>Creator</th>
+                    <th>Subject</th>
+                    <th>Publisher</th>
+                    <th>Contributor</th>
+                    <th>Identifier</th>
+                    <th>Language</th>
+                    <th>Relation</th>
+                    <th>Coverage</th>
+                    <th>Rights</th>
                 </tr>
             </thead>
             <tbody id="results-body">
@@ -98,12 +112,12 @@
             </tbody>
         </table>
     </div>
+    <div id="tiles-results-audio" style="display: none;"></div>
 
     <div class="controls">
         <table><tr>
-            <td id="bottom-results-label">
-                Showing all records
-            </td>
+             <td id="bottom-results-label">
+            </td> 
             <td class="paging-buttons">
                 <button id="bottom-top-page" class="paging-button">Top</button>
                 <button id="bottom-prev-page" class="paging-button">Previous</button>
@@ -121,6 +135,7 @@
         const q_allow_edit = ('{{ allow_edit }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/datatables.min.js' %}"></script>
     <script src="{% static 'js/audio_search.js' %}"></script>
 </body>
 </html>

@@ -221,7 +221,7 @@ function displayAudit(results) {
             <td>${item.audit_id}</td>
             <td>${item.username}</td>
             <td>${item.activity}</td>
-            <td>${formatGMTToLocal(item.event_timestamp)}</td>
+            <td>${formatDate(item.event_timestamp)}</td>
             <td>${item.location == null ? '-' : item.location}</td>
             <td>${item.table_name == null ? '-' : item.table_name.substring(4)}</td>
             <td>${item.record_id == null ? '-' : item.record_id}</td>
@@ -313,7 +313,7 @@ function showFolders(parent_id = 1) {
     }
 
     function appendColumns(row,folder) {
-        const values = [formatGMTToLocal(folder.stats_as_of),timeElapsed(folder.stats_as_of),
+        const values = [formatDate(folder.stats_as_of),timeElapsed(folder.stats_as_of),
             folder.subfolder_count,folder.file_count,folder.video_count,folder.audio_count,
             folder.photo_count,folder.file_count-folder.reviewed_count,folder.reviewed_count];
         values.forEach(value => {
@@ -463,7 +463,7 @@ function replaceRow(folder) {
     const curRow = document.getElementById('row_' + folder.folder_id); 
     const cols = curRow.querySelectorAll('td');
     cols[0].innerHTML = folder.folder_id;
-    cols[2].innerHTML = formatGMTToLocal(folder.stats_as_of);
+    cols[2].innerHTML = formatDate(folder.stats_as_of);
     cols[3].innerHTML = timeElapsed(folder.stats_as_of);
     cols[4].innerHTML = folder.subfolder_count;
     cols[5].innerHTML = folder.file_count;

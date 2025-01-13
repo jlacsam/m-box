@@ -756,3 +756,12 @@ tr.highlighted {
 .json-highlight .null { color: #808080; }
 .json-highlight .key { color: #c52a2a; }
 
+#download-transcript {
+    float: right;
+    margin: 10px;
+    padding: 5px;
+    width: 100px;
+    position: fixed;
+    top: 100px;
+    right: 0;
+}

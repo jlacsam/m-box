@@ -1,6 +1,32 @@
+function accessRightsToStr(owner_rights, group_rights, domain_rights, public_rights) {
+    // Validate input parameters
+    const params = [owner_rights, group_rights, domain_rights, public_rights];
+
+    // Convert a single number (0-7) to rwx format
+    function convertToRWX(num) {
+        const read = (num & 4) ? 'r' : '-';    // Check third bit
+        const write = (num & 2) ? 'w' : '-';   // Check second bit
+        const execute = (num & 1) ? 'x' : '-'; // Check first bit
+        return read + write + execute;
+    }
+
+    // Convert each parameter and concatenate
+    const ownerPerm = convertToRWX(owner_rights);
+    const groupPerm = convertToRWX(group_rights);
+    const domainPerm = convertToRWX(domain_rights);
+    const publicPerm = convertToRWX(public_rights);
+
+    return ownerPerm + '|' + groupPerm + '|' + domainPerm + '|' + publicPerm;
+}
+
 function containsHtmlBreakingChars(str) {
   const dangerousChars = /[<>&'"]/;
   return dangerousChars.test(str);
+}
+
+function coalesce(val) {
+    if (val == null) return "";
+    else return val;
 }
 
 function containsSpace(str) {
@@ -89,9 +115,9 @@ function formatJsonString(jsonString) {
 
 function formatSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1000)));
-    return (bytes / Math.pow(1024, i)).toFixed(3) + ' ' + sizes[i];
+    if (bytes === 0) return '0 Bytes';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
 }
 
 function formatTime(seconds) {
@@ -319,12 +345,20 @@ function sanitizeHtml(str) {
   return str.replace(/[&<>"']/g, function(m) { return map[m]; }).trim();
 }
 
+function sanitizeJson(str) {
+    if (str == null) {
+        return "{}";
+    }
+    return JSON.stringify(str).replaceAll("\\","").replaceAll('"',"");
+}
+
 function timeElapsed(dateString) {
     if (dateString == null) {
         return "N/A";
     }
 
-    const inputDate = new Date(dateString + 'Z'); // Ensure the input is treated as UTC
+    if (!dateString.endsWith('Z')) dateString += 'Z';
+    const inputDate = new Date(dateString);
     const now = new Date(); // Current time in the browser's local timezone
 
     const timeDiff = now - inputDate; // Time difference in milliseconds

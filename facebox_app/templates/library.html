@@ -6,6 +6,7 @@
     <title>m.box Library</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/library.css' %}">
+    <link rel="stylesheet" href="{% static 'css/datatables.min.css' %}">
     <link rel="icon" href="{% static 'favicon.ico' %}">
 </head>
 <body>
@@ -44,18 +45,100 @@
             <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
         </ul>
     </div>
-    <div id="search-bar">
-        <input id="search-box" type="search" class="search" placeholder="[Search assets]">
-    </div>
-    <div id="container">
-        <div id="results-div" class="results-div">
+
+    <div class="container">
+    <table>
+      <tr>
+      <td width=100px class="folder-section">Folder Browser</td>
+      <td width=90%>
+        <div class="search-container">
+            <input id="search-box" type="search" class="search" placeholder="[Search assets]">
+            <p>&nbsp</p>
+            <button id="search-button" class="button">Search</button>
+            <button id="reset-button" class="button">Reset</button>
         </div>
+    
+        <div class="controls">
+            <table><tr>
+                <td>
+                    <span id="results-label">Showing records in</span>
+                    <span id="bread-crumbs" onclick="browseFolder()">[all folders]</span>
+                </td>
+                <td class="paging-buttons">
+                    <button id="btn-rename" class="control-button">Rename</button>
+                    <button id="btn-move" class="control-button">Move</button>
+                    <button id="btn-set-owner" class="control-button">Set Owner</button>
+                    <button id="btn-set-group" class="control-button">Set Group</button>
+                    <button id="btn-set-access" class="control-button">Set Access</button>
+                    <button id="top-page" class="paging-button">&#x21E4</button>
+                    <button id="prev-page" class="paging-button">&#x21A4</button>
+                    <button id="next-page" class="paging-button">&#x21A6</button>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleViewBtn">
+                        <span class="slider-tile"></span>
+                    </label>
+                </td>
+            </tr></table>
+        </div> 
+        <div id="results">
+            <table id="results-table">
+                <thead>
+                    <tr> <!-- 22 columns -->
+                        <th>File ID</th>
+                        <th>Thumbnail</th>
+                        <th>Name</th>
+                        <th>File Type</th>
+                        <th>Media Source</th>
+                        <th>Size</th>
+                        <th>Date Created</th>
+                        <th>Date Uploaded</th>
+                        <th>Last Accessed</th>
+                        <th>Last Modified</th>
+                        <th>Owner Name</th>
+                        <th>Group Name</th>
+                        <th>Access Rights</th>
+                        <th>Remarks</th>
+                        <th>Version</th>
+                        <th>File Attributes</th>
+                        <th>Other Metadata</th>
+                        <th>IP Location</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body">
+                    <!-- Results will be populated here -->
+                </tbody>
+            </table>
+        </div>
+        <div id="tiles-results" style="display: none;"></div>
+
+        <div class="controls">
+            <table><tr>
+                <td id="bottom-results-label">
+                    Showing all records
+                </td>
+                <td class="paging-buttons">
+                    <button id="bottom-top-page" class="paging-button">&#x21E4</button>
+                    <button id="bottom-prev-page" class="paging-button">&#x21A4</button>
+                    <button id="bottom-next-page" class="paging-button">&#x21A6</button>
+                </td>
+            </tr></table>
+        </div>
+      </td></tr></table>
     </div>
+
+    <div id="folder-browser" class='folder-browser-hidden'>
+    </div>
+
     <script>
         const q_is_editor = ('{{ is_editor}}' === 'True');
         const q_is_supervisor = ('{{ is_supervisor }}' === 'True');
+        const q_file_id = '{{ file_id }}'; 
+        const q_file_name = '{{ file_name }}';
+        const q_allow_edit = ('{{ allow_edit }}' === 'True');
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/datatables.min.js' %}"></script>
     <script src="{% static 'js/library.js' %}"></script>
 </body>
 </html>

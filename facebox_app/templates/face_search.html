@@ -71,7 +71,10 @@
                 <td class="search-reset">
                     <div class="buttons">
                         <button id="search-button" class="button">Search</button>
+                        <button id="link-faces-button" style="display: none;" class="button">Show Linked Faces</button>
                         <button id="reset-button" class="button">Reset</button>
+                        <button id="merge-button" disabled class="button">Merge</button>
+                        <button id="unlink-faces-button" style="display: none;" disabled class="button">Unlink Faces</button>
                     </div>
                 </td>
                 <td class="results-td">&nbsp;</td>
@@ -102,7 +105,21 @@
             <button id="editor-cancel" class="editor-button" onclick="cancelEdits()">&#x10102</button>
         </div>
     </div>
-
+    <div class="custom-model-main">
+        <div class="custom-model-inner">        
+        <div class="close-btn">×</div>
+            <div class="custom-model-wrap">
+                <div class="pop-up-content-wrap">
+                   Select Primary Face
+                </div>
+                <div class="table">
+                    
+                </div>
+                <div class="confirm-btn"><button id="confirm-merge" class="button">Confirm</button></div>
+            </div>  
+        </div>  
+        <div class="bg-overlay"></div>
+    </div> 
     <script>
         const q_file_id = '{{ file_id }}'; 
         const q_file_name = '{{ file_name }}';

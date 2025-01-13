@@ -1,464 +1,906 @@
-const SUBSCRIPTION_ID = '00000000';
-const CLIENT_SECRET = '00000000';
-const FILE_STATUSES = ['For review','Reviewed'];
-const APPROVED_STATUS = 'Reviewed';
-const INT_MAX = 2147483647;
-const FOLDER_ICON = '\u{1F4C1}';
+const SUBSCRIPTION_ID = "00000000";
+const CLIENT_SECRET = "00000000";
+const FOLDER_ICON = "\u{1F4C1}";
+const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
 
-let selectedFile = 0
-let selectedFolder = 0
-let editorDiv = null;
-let editorText = null;
-let editorSelect = null;
-let totalFiles = 0;
-let maxRows = 100;
+let currentPage = 1;
+let totalPages = 1;
+let recordSet = null;
+let currentFolder = "/";
+let maxRows = 25;
 
-document.addEventListener('DOMContentLoaded', function() {
+$.fn.dataTable.ext.errMode = 'none';
 
-    const profileIcon = document.getElementById('profile');
-    const popupMenu = document.getElementById('popup-menu');
-    profileIcon.addEventListener('click', function(event) {
-        if (popupMenu.classList.contains('popup-hidden')) {
-            popupMenu.style.top = '65px';
-            popupMenu.style.width = '150px';
-            popupMenu.style.left = (window.innerWidth - 180) + 'px';
-            popupMenu.classList.remove('popup-hidden');
-            popupMenu.classList.add('popup-visible');
-        } else if (popupMenu.classList.contains('popup-visible')) {
-            popupMenu.classList.remove('popup-visible');
-            popupMenu.classList.add('popup-hidden');
-        }
-    });
+document.addEventListener("DOMContentLoaded", function () {
+  const searchBox = document.getElementById("search-box");
+  const searchButton = document.getElementById("search-button");
+  const resetButton = document.getElementById("reset-button");
+  const topPageButton = document.getElementById("top-page");
+  const prevPageButton = document.getElementById("prev-page");
+  const nextPageButton = document.getElementById("next-page");
+  const bottomTopPageButton = document.getElementById("bottom-top-page");
+  const bottomPrevPageButton = document.getElementById("bottom-prev-page");
+  const bottomNextPageButton = document.getElementById("bottom-next-page");
+  const libraryTab = document.getElementById("library-tab");
+  const folderBrowser = document.getElementById("folder-browser");
 
-    popupMenu.addEventListener('mouseleave', function(event) {
-        if (popupMenu.classList.contains('popup-visible')) {
-            popupMenu.classList.remove('popup-visible');
-            popupMenu.classList.add('popup-hidden');
-        }
-    });
+  searchButton.addEventListener("click", performSearch);
+  resetButton.addEventListener("click", resetPage);
+  topPageButton.addEventListener("click", () => goToPage("top"));
+  prevPageButton.addEventListener("click", () => goToPage("prev"));
+  nextPageButton.addEventListener("click", () => goToPage("next"));
+  bottomTopPageButton.addEventListener("click", () => goToPage("top"));
+  bottomPrevPageButton.addEventListener("click", () => goToPage("prev"));
+  bottomNextPageButton.addEventListener("click", () => goToPage("next"));
 
-    const settingsIcon = document.getElementById('settings');
-    const settingsMenu = document.getElementById('settings-menu');
-    settingsIcon.addEventListener('click', function(event) {
-        if (settingsMenu.classList.contains('popup-hidden')) {
-            settingsMenu.style.top = '65px';
-            settingsMenu.style.width = '150px';
-            settingsMenu.style.left = (window.innerWidth - 180) + 'px';
-            settingsMenu.classList.remove('popup-hidden');
-            settingsMenu.classList.add('popup-visible');
-        } else if (settingsMenu.classList.contains('popup-visible')) {
-            settingsMenu.classList.remove('popup-visible');
-            settingsMenu.classList.add('popup-hidden');
-        }
-    });
+  searchBox.addEventListener("keyup", function (event) {
+    if (event.key === "Enter") {
+      performSearch();
+    }
+  });
 
-    settingsMenu.addEventListener('mouseleave', function(event) {
-        if (settingsMenu.classList.contains('popup-visible')) {
-            settingsMenu.classList.remove('popup-visible');
-            settingsMenu.classList.add('popup-hidden');
-        }
-    });
+  const profileIcon = document.getElementById("profile");
+  const popupMenu = document.getElementById("popup-menu");
+  profileIcon.addEventListener("click", function (event) {
+    if (popupMenu.classList.contains("popup-hidden")) {
+      popupMenu.style.top = "65px";
+      popupMenu.style.width = "150px";
+      popupMenu.style.left = window.innerWidth - 180 + "px";
+      popupMenu.classList.remove("popup-hidden");
+      popupMenu.classList.add("popup-visible");
+    } else if (popupMenu.classList.contains("popup-visible")) {
+      popupMenu.classList.remove("popup-visible");
+      popupMenu.classList.add("popup-hidden");
+    }
+  });
 
-    const libraryTab = document.getElementById('library-tab');
-    libraryTab.style.color = '#ffffff';
+  popupMenu.addEventListener("mouseleave", function (event) {
+    if (popupMenu.classList.contains("popup-visible")) {
+      popupMenu.classList.remove("popup-visible");
+      popupMenu.classList.add("popup-hidden");
+    }
+  });
 
-    setMaxRows(maxRows);
-    showFolders();
-    getGroups();
+  const settingsIcon = document.getElementById("settings");
+  const settingsMenu = document.getElementById("settings-menu");
+  settingsIcon.addEventListener("click", function (event) {
+    if (settingsMenu.classList.contains("popup-hidden")) {
+      settingsMenu.style.top = "65px";
+      settingsMenu.style.width = "150px";
+      settingsMenu.style.left = window.innerWidth - 180 + "px";
+      settingsMenu.classList.remove("popup-hidden");
+      settingsMenu.classList.add("popup-visible");
+    } else if (settingsMenu.classList.contains("popup-visible")) {
+      settingsMenu.classList.remove("popup-visible");
+      settingsMenu.classList.add("popup-hidden");
+    }
+  });
+
+  settingsMenu.addEventListener("mouseleave", function (event) {
+    if (settingsMenu.classList.contains("popup-visible")) {
+      settingsMenu.classList.remove("popup-visible");
+      settingsMenu.classList.add("popup-hidden");
+    }
+  });
+
+  folderBrowser.addEventListener("mouseleave", function (Event) {
+    if (folderBrowser.classList.contains("folder-browser-visible")) {
+      folderBrowser.classList.remove("folder-browser-visible");
+      folderBrowser.classList.add("folder-browser-hidden");
+    }
+  });
+
+  libraryTab.style.color = "#ffffff";
+
+  setMaxRows(maxRows);
+  getGroups();
+
+  // Initial load
+  performSearch();
 });
 
 function getGroups() {
-    const csrftoken = getCookie('csrftoken');
-    fetch('/api/get-groups/', {
-        method: 'GET',
-        headers: {
-            'Subscription-ID': SUBSCRIPTION_ID,
-            'Client-Secret': CLIENT_SECRET,
-            'X-CSRFToken': csrftoken,
-        }
+  const csrftoken = getCookie("csrftoken");
+  fetch("/api/get-groups/", {
+    method: "GET",
+    headers: {
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "X-CSRFToken": csrftoken,
+    },
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      displayGroups(data.groups);
+      if (data.groups.includes("Editors")) {
+        isEditor = true;
+      }
     })
-    .then(response => response.json())
-    .then(data => {
-        displayGroups(data.groups);
-        if (data.groups.includes('Editors')) {
-            isEditor = true;
-        }
-    })
-    .catch(error => {
-        console.log(error);
+    .catch((error) => {
+      console.log(error);
     });
 }
 
 function displayGroups(groups) {
-    const userGroups = document.getElementById('user-groups');
-    let html = `<p class='groups-label'>Groups</p>`;
-    groups.forEach(group => {
-        html += `<p class='group-name'>- ${group}</p>`;
-    });
-    userGroups.innerHTML = html;
+  const userGroups = document.getElementById("user-groups");
+  let html = `<p class='groups-label'>Groups</p>`;
+  groups.forEach((group) => {
+    html += `<p class='group-name'>- ${group}</p>`;
+  });
+  userGroups.innerHTML = html;
 }
 
-function getFileCount(folder_id) {
-    const csrftoken = getCookie('csrftoken');
-    fetch(`/api/get-file-count/${folder_id}/`, {
-        method: 'GET',
-        headers: {
-            'Subscription-ID': SUBSCRIPTION_ID,
-            'Client-Secret': CLIENT_SECRET,
-            'X-CSRFToken': csrftoken,
+function performSearch() {
+  /* Valid cases:
+       Empty search string = get all records
+       Improperly quoted - error
+console.log('hello',isValidTsQueryString('hello')); // true
+console.log('"hello"',isValidTsQueryString('"hello"')); // true
+console.log('hello world',isValidTsQueryString('hello world')); // true
+console.log('"hello world"',isValidTsQueryString('"hello world"')); // true
+console.log('hello & world',isValidTsQueryString('hello & world')); // true
+console.log('hello | world',isValidTsQueryString('hello | world')); // true
+console.log('!hello',isValidTsQueryString('!hello')); // true
+console.log('(hello)',isValidTsQueryString('(hello)')); // true
+console.log('"hello" world',isValidTsQueryString('"hello" world')); // false
+console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
+    */
+  const searchBox = document.getElementById("search-box");
+  let value = searchBox.value.trim();
+  currentPage = 1;
+  if (value.length == 0 || isValidTsQueryString(value)) {
+    searchVideos(value, currentFolder);
+  } else if (isUnquoted(value) && containsSpace(value)) {
+    // make the search string a valid TsQuery. Assume OR.
+    value = trimWhitespaces(value).replaceAll(" ", " | ");
+    searchVideos(value, currentFolder);
+  } else {
+    alert("Invalid search string.");
+  }
+}
+
+function updatePlaceholder() {
+  const searchBox = document.getElementById("search-box");
+  if (currentFolder == "/") {
+    searchBox.placeholder = "[Search videos in all folders]";
+  } else {
+    searchBox.placeholder = `[Search videos in ${currentFolder}]`;
+  }
+}
+
+function resetPage() {
+  const searchBox = document.getElementById("search-box");
+  searchBox.value = "";
+  updatePlaceholder();
+  currentPage = 1;
+  searchVideos("", currentFolder);
+//   applyFilters();
+}
+
+function applyFilters() {
+  $(document).ready(function () {
+    const tableConfig = {
+      paging: false,
+      searching: false,
+      ordering: true,
+      info: false,
+      order: [[0, "asc"]],
+      columnDefs: [
+        {
+          targets: [6, 8, 9, 14, 16, 17, 18],
+          visible: false,
+        },
+        {
+          targets: [2, 13, 15, 16, 17],
+          orderable: false
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        totalFiles = data.result;
-        document.getElementById('detail-file-count').innerHTML = data.result + ' files)';
-    })
-    .catch(error => {
-        console.log(error);
-    });
-}
+      ]
+    };
 
-function toggleClearButton() {
-    const searchInput = document.getElementById('username-search');
-    const clearButton = document.getElementById('clear-button');
-    
-    if (searchInput.value.length > 0) {
-        clearButton.style.display = 'block';
+    if ($.fn.dataTable.isDataTable("#results-table")) {
+      table = $("#results-table").DataTable();
+      table.destroy();
+      $("#results-table").DataTable(tableConfig);
     } else {
-        clearButton.style.display = 'none';
+      $("#results-table").DataTable(tableConfig);
     }
+
+    // Add custom column visibility button
+    addColumnVisibilityButton();
+  });
 }
 
-function clearSearch() {
-    const searchInput = document.getElementById('username-search');
-    searchInput.value = '';
-    toggleClearButton();
+// Add this new function to create and handle the custom button
+function addColumnVisibilityButton() {
+  // Select the td elements with class 'paging-buttons'
+  const topPagingButtons = document.querySelector('.controls table tr td.paging-buttons');
+  
+  if (!topPagingButtons) {
+    console.error('Could not find paging buttons containers');
+    return;
+  }
+
+  // Create buttons for top and bottom controls
+  const topButton = createColumnButton();
+  
+  // Insert buttons before the toggle view button in top controls
+  const toggleBtn = document.querySelector('#toggleViewBtn');
+  if (toggleBtn && toggleBtn.parentElement) {
+    toggleBtn.parentElement.parentElement.insertBefore(topButton, toggleBtn.parentElement);
+  } else {
+    topPagingButtons.insertBefore(topButton, topPagingButtons.firstChild);
+  }
+  
+  // Initialize the column visibility functionality
+  initializeColumnVisibility();
 }
 
-function searchAudit() {
-    const auditRecords = document.getElementById('audit-records');
-    auditRecords.style.color = '#ffffff';
-    const folderCounts = document.getElementById('folder-counts');
-    folderCounts.style.color = '#888888';
+function createColumnButton() {
+  const button = document.createElement('button');
+  button.className = 'filter-button column-visibility-btn';
+  button.textContent = COLUMN_FILTER_ICON;
+  return button;
+}
 
-    let username = document.getElementById('username-search').value;
-    let start_date = document.getElementById('start-date').value;
-    let end_date = document.getElementById('end-date').value;
-
-    if (username == null || username.trim().length == 0) username = '%';
-    username = username.replace('*','%');
-
-    if (start_date == null || start_date.trim().length == 0) {
-       start_date = '2024/1/1 00:00:00.000';
-    }
-    if (end_date == null || end_date.trim().length == 0) {
-        const timeNow = new Date();
-        end_date = timeNow.toISOString();
-    }
-
-    const csrftoken = getCookie('csrftoken');
-    fetch('/api/search-audit/', {
-        method: 'GET',
-        headers: {
-            'Subscription-ID': SUBSCRIPTION_ID,
-            'Client-Secret': CLIENT_SECRET,
-            'Max-Rows': maxRows,
-            'Username': username,
-            'Start-Date': start_date,
-            'End-Date': end_date,
-            'X-CSRFToken': csrftoken,
+function initializeColumnVisibility() {
+  // Add click handler to both buttons
+  document.querySelectorAll('.column-visibility-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const table = $('#results-table').DataTable();
+      
+      // Get all columns except the first one
+      const columns = table.columns().indexes().toArray().slice(1);
+      
+      // Create popup menu for column selection
+      const menu = document.createElement('div');
+      menu.className = 'column-menu popup-visible';
+      menu.style.position = 'absolute';
+      menu.style.backgroundColor = 'white';
+      menu.style.border = '1px solid #ccc';
+      menu.style.padding = '10px';
+      menu.style.zIndex = '1000';
+      
+      // Add checkboxes for each column
+      columns.forEach(colIdx => {
+        const col = table.column(colIdx);
+        const div = document.createElement('div');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = col.visible();
+        
+        checkbox.addEventListener('change', function() {
+          col.visible(this.checked);
+        });
+        
+        div.appendChild(checkbox);
+        div.appendChild(document.createTextNode(' ' + $(col.header()).text()));
+        menu.appendChild(div);
+      });
+      
+      // Add close button
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = 'Close';
+      closeBtn.style.marginTop = '10px';
+      closeBtn.addEventListener('click', () => menu.remove());
+      menu.appendChild(closeBtn);
+      
+      // Position menu near the clicked button
+      const rect = btn.getBoundingClientRect();
+      menu.style.top = rect.bottom + 'px';
+      menu.style.left = (rect.left-110) + 'px';
+      
+      // Remove any existing menus and add the new one
+      document.querySelectorAll('.column-menu').forEach(m => m.remove());
+      document.body.appendChild(menu);
+      
+      // Close menu when clicking outside
+      document.addEventListener('click', function closeMenu(e) {
+        if (!menu.contains(e.target) && e.target !== btn) {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
         }
+      });
+    });
+  });
+}
+
+function searchVideos(pattern = "", scope = "/") {
+  const csrftoken = getCookie("csrftoken");
+  const offset = (currentPage - 1) * maxRows;
+  table = $("#results-table").DataTable();
+  table.destroy();
+  fetch("/api/search-video/", {
+    method: "GET",
+    headers: {
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "Max-Rows": maxRows,
+      "Start-From": offset,
+      Pattern: pattern,
+      Scope: scope,
+      "Media-Type": "video",
+      "X-CSRFToken": csrftoken,
+    },
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.error) {
+        displayError(data.error);
+      } else {
+        recordSet = data.results;
+        displayResults(data.results);
+        highlightWords(dequote(pattern));
+        updatePagination(data.results);
+        displayThumbnails(data.results);
+      }
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            console.log(data.error);
-        } else {
-            displayAudit(data.results);
+    .catch((error) => {
+      console.log(error);
+      displayError("An error occurred while fetching data.");
+    });
+}
+// =======
+function openVideoPopup(videoUrl, startTime) {
+  const popup = document.createElement("div");
+  popup.className = "video-popup";
+  popup.innerHTML = `
+        <div class="popup-content">
+          <button class="close-popup" onclick="closeVideoPopup()">X</button>
+          <video controls >
+            <source src="${videoUrl}#t=${startTime}" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>`;
+  document.body.appendChild(popup);
+}
+
+function closeVideoPopup() {
+  const popup = document.querySelector(".video-popup");
+  if (popup) {
+    popup.remove();
+  }
+}
+function displayResultsTiles(data, append = false) {
+  const resultsBodyTiles = document.getElementById("tiles-results");
+  if (!resultsBodyTiles) {
+    console.error("Element with ID 'tiles-results' not found");
+    resultsBodyTiles.innerHTML = "No Records Found";
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    console.error("Data is empty or invalid:", data);
+    resultsBodyTiles.innerHTML = "No Records Found";
+    return;
+  }
+
+  let html = "";
+
+  data.forEach((item) => {
+    attributes = JSON.parse(item.attributes);
+    videoLength = Math.abs(attributes["length"]);
+    const formattedTime = timeToStr(videoLength);
+    attributes.length = formattedTime;
+    attributes_new = JSON.stringify(attributes)
+        .replaceAll("\\", "")
+        .replaceAll('"', "")
+        .replaceAll(",", ", ");
+    html += `
+      <div class="tile">
+        <table class="tile_table">
+          <tr class="title-field" data-file-id-tile="${item.file_id}" >
+            <td>
+              <table>
+                <tr>
+                  <td>
+                    <img class="thumbnail" id="thumbnail_tiles${
+                      item.file_id
+                    }" src="" alt="thumbnail"    
+                     data-video-url="${item.file_url}" >
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="field_label">File Size</div>
+                    <div class="field_value">${(
+                      item.size /
+                      1024 /
+                      1024
+                    ).toFixed(2)} MB</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td>
+              <table class="table_fields">
+                <tr>
+                  <td>
+                    <div class="field_label">Title</div>
+                    <div class="field_value"   data-title="${
+                      item.title
+                    }" data-file-id-tile="${item.file_id}" >${item.title}</div>
+                  </td>
+                  
+                </tr>
+                <tr>
+                  <td>
+                    <div class="field_label">Filename</div>
+                    <div class="field_value">
+                      <a href="${
+                        item.file_url
+                      }" class="hyperlink" target="_blank">
+                        ${item.file_name}
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="field_label">Description</div>
+                    <div class="field_value">${item.description}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="field_label">Attributes</div>
+                    <div class="field_value">
+                      Length: ${attributes.length}<br />
+                      Frame Rate: ${attributes.frame_rate} FPS<br />
+                      Audio Channels: ${attributes.audio_channels}<br />
+                      Resolution: ${attributes.video_resolution}<br />
+                      Sample Rate: ${attributes.audio_sample_rate} Hz
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  });
+
+  if (append) {
+    resultsBodyTiles.innerHTML += html;
+  } else {
+    resultsBodyTiles.innerHTML = html;
+  }
+  const thumbnails = document.querySelectorAll(".thumbnail");
+  thumbnails.forEach((thumbnail) => {
+    thumbnail.addEventListener("click", () => {
+      const videoUrl = thumbnail.getAttribute("data-video-url");
+      const startTime = thumbnail.getAttribute("data-start-time");
+
+      // Open popup and play video
+      openVideoPopup(videoUrl, startTime);
+    });
+  });
+  const titles = document.querySelectorAll(".title-field");
+  titles.forEach((title) => {
+    title.addEventListener("dblclick", () => {
+      const fileId = title.getAttribute("data-file-id-tile"); // Correctly fetch the file_id
+      const titleText = title.getAttribute("data-title") || "No title";
+      if (fileId) {
+        window.open(
+          `/app/media-player/?file_id=${fileId}&file_name=video`,
+          "_blank"
+        );
+      } else {
+        console.error("file_id is null or undefined.");
+      }
+    });
+  });
+  displayThumbnailsTiles(data);
+}
+
+// =======below function used to display table Videos table========
+function displayResults(results) {
+  table = $("#results-table").DataTable();
+  table.destroy();
+  applyFilters();
+  const resultsBody = document.getElementById("results-body");
+  resultsBody.innerHTML = "";
+  // console.log("DisplayResult====>", results);
+  displayResultsTiles(results);
+  if (results == null) {
+    resultsBody.innerHTML =
+      '<tr><td colspan="21">API call returned null.</td></tr>';
+    return;
+  }
+
+  if (results.length === 0) {
+    resultsBody.innerHTML =
+      '<tr><td colspan="21">No matching records found.</td></tr>';
+    return;
+  }
+
+  results.forEach((item) => {
+    const row = document.createElement("tr");
+    row.id = "row_" + item.file_id;
+    row.addEventListener("dblclick", function (event) {
+      window.open(
+        "/app/media-player/?file_id=" + item.file_id + "&file_name=video",
+        "_blank"
+      );
+    });
+
+    let html = `
+            <td><input type='checkbox' id='checkbox_${item.file_id}'>${item.file_id}</td>
+            <td><img class="thumbnail thumbnail_tab" id="thumbnail_${
+              item.file_id
+            }" src=""  data-video-url="${item.file_url}" alt="thumbnail"></td>
+            <td><a href="${item.file_url}" class="hyperlink" target="_blank">${item.file_name}</a></td>
+            <td>${item.extension.toUpperCase().replaceAll(".", "")}</td>
+            <td>${item.media_source}</td>
+            <td>${formatSize(item.size)}</td>
+            <td>${formatDate(item.date_created)}</td>
+            <td>${formatDate(item.date_uploaded)}</td>
+            <td>${formatDate(item.last_accessed)}</td>
+            <td>${formatDate(item.last_modified)}</td>
+            <td>${coalesce(item.owner_name)}</td>
+            <td>${coalesce(item.group_name)}</td>
+            <td>${accessRightsToStr(item.owner_rights,item.group_rights,item.domain_rights,item.public_rights)}</td>
+            <td>${coalesce(item.remarks)}</td>
+            <td>${item.version}</td>
+            <td>${sanitizeJson(item.attributes)}</td>
+            <td>${sanitizeJson(item.extra_data)}</td>
+            <td>${item.ip_location}</td>
+            <td>${item.file_status}</td>`;
+    row.innerHTML = html;
+    resultsBody.appendChild(row);
+  });
+  const thumbnails = document.querySelectorAll(".thumbnail_tab");
+  thumbnails.forEach((thumbnail) => {
+    thumbnail.addEventListener("click", () => {
+      const videoUrl = thumbnail.getAttribute("data-video-url");
+      const startTime = thumbnail.getAttribute("data-start-time");
+
+      // Open popup and play video
+      openVideoPopup(videoUrl, startTime);
+    });
+  });
+}
+
+document.getElementById("toggleViewBtn").addEventListener("click", function () {
+  const tableView = document.getElementById("results");
+  const tileView = document.getElementById("tiles-results");
+
+  if (tableView.style.display === "none") {
+    tableView.style.display = "block";
+    tileView.style.display = "none";
+    this.textContent = "Switch to Tile View"; // Update button text
+  } else {
+    tableView.style.display = "none";
+    tileView.style.display = "flex";
+    this.textContent = "Switch to Table View"; // Update button text
+    // displayTileView(); // Function to populate tiles
+  }
+});
+
+function displayThumbnailsTiles(results) {
+  const csrftoken = getCookie("csrftoken");
+  results.forEach((item) => {
+    fetch(`/api/get-thumbnail/${item.file_id}/`, {
+      method: "GET",
+      headers: {
+        "Subscription-ID": SUBSCRIPTION_ID,
+        "Client-Secret": CLIENT_SECRET,
+        "X-CSRFToken": csrftoken,
+      },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
         }
+        return response.blob(); // Get the image data as a blob
+      })
+      .then((blob) => {
+        isValidJPEG(blob).then((isValid) => {
+          if (isValid) {
+            // Create a URL for the blob and display it as an image
+            const imageUrl = URL.createObjectURL(blob);
+            const imageObj = document.getElementById(
+              "thumbnail_tiles" + item.file_id
+            );
+            imageObj.src = imageUrl;
+          } else {
+            console.error("Invalid JPEG file");
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+        document.getElementById("imageDisplay").innerHTML =
+          "<p>Error loading image</p>";
+      });
+  });
+}
+function displayThumbnails(results) {
+  const csrftoken = getCookie("csrftoken");
+  results.forEach((item) => {
+    fetch(`/api/get-thumbnail/${item.file_id}/`, {
+      method: "GET",
+      headers: {
+        "Subscription-ID": SUBSCRIPTION_ID,
+        "Client-Secret": CLIENT_SECRET,
+        "X-CSRFToken": csrftoken,
+      },
     })
-    .catch(error => {
-        alert('Unable to save data. Error:', error);
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return response.blob(); // Get the image data as a blob
+      })
+      .then((blob) => {
+        isValidJPEG(blob).then((isValid) => {
+          if (isValid) {
+            // Create a URL for the blob and display it as an image
+            const imageUrl = URL.createObjectURL(blob);
+            const imageObj = document.getElementById(
+              "thumbnail_" + item.file_id
+            );
+            imageObj.src = imageUrl;
+          } else {
+            console.error("Invalid JPEG file");
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+        document.getElementById("imageDisplay").innerHTML =
+          "<p>Error loading image</p>";
+      });
+  });
+}
+
+function highlightWords(searchString) {
+  if (searchString.length == 0) {
+    //console.log('Nothing to highlight.');
+    return;
+  }
+  const table = document.getElementById("results-table");
+  const searchWords = searchString.toLowerCase().split(/\s+/);
+
+  function highlightNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      let content = node.textContent;
+      let lowerContent = content.toLowerCase();
+      let changed = false;
+
+      for (let word of searchWords) {
+        if (lowerContent.includes(word)) {
+          let regex = new RegExp(`(${word})`, "gi");
+          content = content.replace(regex, (match) => {
+            changed = true;
+            return `<span style="background-color: #808000;">${match}</span>`;
+          });
+        }
+      }
+
+      if (changed) {
+        let span = document.createElement("span");
+        span.innerHTML = content;
+        node.parentNode.replaceChild(span, node);
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      for (let child of node.childNodes) {
+        highlightNode(child);
+      }
+    }
+  }
+
+  const tdElements = table.getElementsByTagName("td");
+  for (let td of tdElements) {
+    highlightNode(td);
+  }
+}
+
+function formatTime(seconds) {
+  const sign = seconds < 0 ? "-" : "";
+  seconds = Math.abs(seconds);
+
+  return sign + new Date(seconds * 1000).toISOString().slice(11, 23);
+}
+
+function updatePagination(results) {
+  if (results == null) return;
+
+  const prevPageButton = document.getElementById("prev-page");
+  const nextPageButton = document.getElementById("next-page");
+  const bottomPrevPageButton = document.getElementById("bottom-prev-page");
+  const bottomNextPageButton = document.getElementById("bottom-next-page");
+
+  prevPageButton.disabled = currentPage === 1;
+  bottomPrevPageButton.disabled = currentPage === 1;
+
+  nextPageButton.disabled = results.length < maxRows;
+  bottomNextPageButton.disabled = results.length < maxRows;
+}
+
+function goToPage(direction) {
+  switch (direction) {
+    case "top":
+      currentPage = 1;
+      break;
+    case "prev":
+      if (currentPage > 1) {
+        currentPage--;
+      }
+      break;
+    case "next":
+      currentPage++;
+      break;
+  }
+  searchVideos(document.getElementById("search-box").value, currentFolder);
+}
+
+function displayError(message) {
+  const resultsBody = document.getElementById("results-body");
+  resultsBody.innerHTML = `<tr><td colspan="20">${message}</td></tr>`;
+}
+
+function browseFolder(parent_id = 1) {
+  function fetchFolders(parent_id = 1) {
+    const csrftoken = getCookie("csrftoken");
+    return fetch(`/api/get-folders/${parent_id}/`, {
+      method: "GET",
+      headers: {
+        "Subscription-ID": SUBSCRIPTION_ID,
+        "Client-Secret": CLIENT_SECRET,
+        "Parent-ID": parent_id,
+        "Max-Rows": maxRows,
+        "X-CSRFToken": csrftoken,
+      },
+    }).then((response) => response.json());
+  }
+
+  function createFolderElement(tree, folder) {
+    const row = document.createElement("tr");
+    const col = document.createElement("td");
+    const icon = document.createElement("span");
+    const label = document.createElement("span");
+    row.appendChild(col);
+    col.appendChild(icon);
+    col.appendChild(label);
+    icon.innerHTML = FOLDER_ICON;
+    icon.style.paddingLeft = folder.folder_level * FOLDER_WIDTH + "px";
+    icon.setAttribute("folder_id", folder.folder_id);
+    icon.classList.add("folder-icon");
+    label.innerHTML = folder.name;
+    label.setAttribute("folder_id", folder.folder_id);
+    label.classList.add("folder-label");
+
+    // Handle folder double-click to load subfolders
+    icon.addEventListener("dblclick", function (event) {
+      let lastRow = row;
+      fetchFolders(folder.folder_id).then((subfolders) => {
+        if (subfolders.results.length) {
+          subfolders.results.forEach((subfolder) => {
+            const newRow = createFolderElement(tree, subfolder);
+            tree.insertBefore(newRow, lastRow.nextSibling);
+            lastRow = newRow;
+          });
+        }
+      });
     });
-}
 
-function showAudit() {
-
-    const resultsDiv = document.getElementById('results-div');
-    let html = `<div class='audit-elements'>
-        <div class="search-input-wrapper">
-            <input type="text" id="username-search" class="search-input" placeholder="[Search username]" 
-                oninput="toggleClearButton()">
-            <span class="clear-button" id="clear-button" onclick="clearSearch()">&#10006;</span>
-        </div>
-        <input type="date" id="start-date">
-        <input type="date" id="end-date">
-        <button onclick="searchAudit()" class="search-button">Search</button>
-    </div>
-    <div id='audit-log' class='audit-elements'></div>`;
-    resultsDiv.innerHTML = html;
-
-    searchAudit();
-}
-
-function displayAudit(results) {
-    const auditLog = document.getElementById('audit-log');
-    if (results.length === 0) {
-        auditLog.innerHTML = `<table class='results-table'><tr><td>No audit records found.</td></tr></table>`;
-        return;
-    }
-
-    let html = `<table class='results-table'><tr><th>Audit ID</th><th>Username</th><th>Action</th><th>Timestamp</th>
-        <th>Location</th><th>Table</th><th>Record ID</th><th>Old Data</th><th>New Data</th><th>Remarks</th></tr>`;
-    results.forEach(item => {
-        html += `<tr>
-            <td>${item.audit_id}</td>
-            <td>${item.username}</td>
-            <td>${item.activity}</td>
-            <td>${formatGMTToLocal(item.event_timestamp)}</td>
-            <td>${item.location == null ? '-' : item.location}</td>
-            <td>${item.table_name == null ? '-' : item.table_name.substring(4)}</td>
-            <td>${item.record_id == null ? '-' : item.record_id}</td>
-            <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></td>
-            <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></td>
-            <td>${item.remarks == null ? '-' : item.remarks}</td>
-            </tr>`;
+    // Handle folder click to select the folder
+    label.addEventListener("click", function (event) {
+      folder["path_name"] = folder.path + folder.name;
+      selectFolder(folder);
     });
-    html += '</table>';
-    auditLog.innerHTML = html;
-}
 
-function showFolders(parent_id = 1) {
+    return row;
+  }
 
-    function fetchFolders(parent_id = 1) {
-        const csrftoken = getCookie('csrftoken');
-        return fetch(`/api/get-folders/${parent_id}/`, {
-            method: 'GET',
-            headers: {
-                'Subscription-ID': SUBSCRIPTION_ID,
-                'Client-Secret': CLIENT_SECRET,
-                'Parent-ID': parent_id,
-                'Max-Rows': maxRows,
-                'X-CSRFToken': csrftoken,
-            }
-        })
-        .then(response => response.json())
-    }
+  function createRootFolder() {
+    const table = document.createElement("table");
+    const row = document.createElement("tr");
+    const col = document.createElement("td");
+    const icon = document.createElement("span");
+    const label = document.createElement("span");
+    row.appendChild(col);
+    col.appendChild(icon);
+    col.appendChild(label);
+    table.appendChild(row);
+    table.id = "folder-tree";
+    icon.style.paddingLeft = "0px";
+    icon.innerHTML = FOLDER_ICON;
+    icon.setAttribute("folder_id", 1);
+    icon.classList.add("folder-icon");
+    label.innerHTML = "[all folders]";
+    label.setAttribute("folder_id", 1);
+    label.classList.add("folder-label");
 
-    function createFolderElement(tree,folder) {
-        const row = document.createElement('tr');
-        const col1 = document.createElement('td');
-        const col2 = document.createElement('td');
-        const icon = document.createElement('span');
-        const label = document.createElement('span');
-        row.id = 'row_' + folder.folder_id;
-        row.appendChild(col1);
-        row.appendChild(col2);
-        col1.innerHTML = folder.folder_id;
-        col2.appendChild(icon);
-        col2.appendChild(label);
-        icon.innerHTML = FOLDER_ICON;
-        icon.style.paddingLeft = (folder.folder_level * FOLDER_WIDTH) + 'px';
-        icon.setAttribute('folder_id',folder.folder_id);
-        icon.classList.add('folder-icon');
-        label.innerHTML = folder.name;
-        label.setAttribute('folder_id',folder.folder_id);
-        label.classList.add('folder-label');
-        appendColumns(row,folder);
+    // Handle folder click to select the folder
+    label.addEventListener("click", function (event) {
+      let folder = {
+        folder_id: 1,
+        path: "",
+        name: "[all folders]",
+        path_name: "/",
+        folder_level: 0,
+      };
+      selectFolder(folder);
+    });
 
-        // Handle folder double-click to load subfolders
-        icon.addEventListener('dblclick', function(event) {
-            let lastRow = row;
-            fetchFolders(folder.folder_id).then(subfolders => {
-                if (subfolders.results.length) {
-                    subfolders.results.forEach(subfolder => {
-                        const newRow = createFolderElement(tree,subfolder);
-                        tree.insertBefore(newRow,lastRow.nextSibling);
-                        lastRow = newRow;
-                    });
-                }
-            });
-        });
+    return table;
+  }
 
-        // Handle folder click to select the folder
-        label.addEventListener('click', function(event) {
-            folder['path_name'] = folder.path + folder.name;
-            selectFolder(folder);
-        });
+  fetchFolders(parent_id)
+    .then((folders) => {
+      const folderBrowser = document.getElementById("folder-browser");
+      folderBrowser.innerHTML = "";
+      const rootFolder = createRootFolder();
+      folderBrowser.appendChild(rootFolder);
 
-        return row;
-    }
+      folders.results.forEach((folder) => {
+        rootFolder.appendChild(createFolderElement(rootFolder, folder));
+      });
 
-    function createHeaders(table) {
-        const row = document.createElement('tr');
-        table.appendChild(row);
-        const headers = ['ID','Folder Name','Size','Last Accessed','Last Modified','Owner','Group',
-            'Owner Rights','Group Rights','Domain Rights','Public Rights',''];
-        headers.forEach(header => {
-            const hd = document.createElement('th');
-            hd.innerHTML = header;
-            row.appendChild(hd);
-        });
-    }
+      folderBrowser.classList.remove("folder-browser-hidden");
+      folderBrowser.classList.add("folder-browser-visible");
 
-    function appendColumns(row,folder) {
-        const values = [folder.size,folder.last_accessed,folder.last_modified,folder.owner_name,
-            folder.group_name,folder.owner_rights,folder.group_rights,folder.domain_rights,folder.public_rights];
-        values.forEach(value => {
-            let col = document.createElement('td');
-            col.innerHTML = value;
-            col.style.textAlign = 'right';
-            row.appendChild(col);
-        });
-        let col = document.createElement('td');
-        col.style.textAlign = 'center';
-        row.appendChild(col);
-        let button = document.createElement('button');
-        button.innerHTML = '\u27F3';
-        button.addEventListener('click', function() {
-            if (confirm('This operation can potentially slowdown the server when the number of files in the folder is tens of thousands or more. Continue?')) {
-                refreshFolderStats(folder.folder_id);
-            }
-        });
-        col.appendChild(button);
-    }
-
-    function createRootFolder(folder) {
-        const table = document.createElement('table');
-        createHeaders(table);
-        const row = document.createElement('tr');
-        const col1 = document.createElement('td');
-        const col2 = document.createElement('td');
-        const icon = document.createElement('span');
-        const label = document.createElement('span');
-        row.id = 'row_' + folder.folder_id;
-        row.appendChild(col1);
-        row.appendChild(col2);
-        col1.innerHTML = folder.folder_id;
-        col2.appendChild(icon);
-        col2.appendChild(label);
-        table.appendChild(row);
-        table.id = 'folder-tree';
-        table.classList.add('results-table');
-        icon.style.paddingLeft = '0px';
-        icon.innerHTML = FOLDER_ICON;
-        icon.setAttribute('folder_id',1);
-        icon.classList.add('folder-icon');
-        label.innerHTML = '[all folders]';
-        label.setAttribute('folder_id',1);
-        label.classList.add('folder-label');
-        appendColumns(row,folder);
-
-        // Handle folder click to select the folder
-        label.addEventListener('click', function(event) {
-            let folder = { folder_id: 1, path: '', name: '[all folders]', path_name: '/', folder_level: 0 };
-            selectFolder(folder);
-        });
-
-        return table;
-    }
-
-    fetchFolders(0).then(folders => {
-        const folderBrowser = document.getElementById('results-div');
-        folderBrowser.innerHTML = '';
-        const rootFolder = createRootFolder(folders.results[0]);
-        folderBrowser.appendChild(rootFolder);
-
-        fetchFolders(parent_id).then(folders => {
-            folders.results.forEach(folder => {
-                rootFolder.appendChild(createFolderElement(rootFolder,folder));
-            });
-        })
-        .catch(error => {
-            console.log(error);
-            alert('An error occurred while fetching folders.');
-        });
+      const breadCrumbs = document.getElementById("bread-crumbs");
+      const rect = breadCrumbs.getBoundingClientRect();
+      folderBrowser.style.top = rect.y + rect.height + "px";
+      folderBrowser.style.left = rect.x + "px";
     })
-    .catch(error => {
-        console.log(error);
-        alert('An error occurred while fetching the root folder.');
+    .catch((error) => {
+      console.log(error);
+      alert("An error occurred while fetching folders.");
     });
+
+//   applyFilters();
 }
 
 function selectFolder(folder) {
-    console.log('No action associated to selecting a folder.');
+  const folderBrowser = document.getElementById("folder-browser");
+  if (folderBrowser.classList.contains("folder-browser-visible")) {
+    folderBrowser.classList.remove("folder-browser-visible");
+    folderBrowser.classList.add("folder-browser-hidden");
+  }
+  const breadCrumbs = document.getElementById("bread-crumbs");
+  breadCrumbs.innerHTML = folder.path + folder.name;
+  currentFolder = folder.path_name;
+  updatePlaceholder();
+  performSearch();
+  applyFilters();
 }
 
 function setMaxRows(value) {
-    maxRows = value;
-    const maxRowsUL = document.getElementById('max-rows-options');
-    const maxRowsLIs = maxRowsUL.querySelectorAll('li');
-    maxRowsLIs.forEach(li => {
-        if (li.id == ("li-"+maxRows.toString())) {
-            li.style.listStyleType = 'disc';
-        } else {
-            li.style.listStyleType = 'none';
-        }
-    });
-}
-
-function refreshFolderStats(folder_id) {
-    if (!q_is_supervisor) {
-        alert('You are not authorized to perform this action.');
-        return;
+  maxRows = value;
+  const maxRowsUL = document.getElementById("max-rows-options");
+  const maxRowsLIs = maxRowsUL.querySelectorAll("li");
+  maxRowsLIs.forEach((li) => {
+    if (li.id == "li-" + maxRows.toString()) {
+      li.style.listStyleType = "disc";
+    } else {
+      li.style.listStyleType = "none";
     }
-
-    const csrftoken = getCookie('csrftoken');
-    fetch(`/api/refresh-folder-stats/${folder_id}/`, {
-        method: 'PATCH',
-        headers: {
-            'Subscription-ID': SUBSCRIPTION_ID,
-            'Client-Secret': CLIENT_SECRET,
-            'Folder-ID': folder_id,
-            'Max-Rows': maxRows,
-            'X-CSRFToken': csrftoken,
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.rowcount > 0) {
-            fetch(`/api/get-folder/${folder_id}/`, {
-                method: 'GET',
-                headers: {
-                    'Subscription-ID': SUBSCRIPTION_ID,
-                    'Client-Secret': CLIENT_SECRET,
-                    'Folder-ID': folder_id,
-                    'Max-Rows': maxRows,
-                    'X-CSRFToken': csrftoken,
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.log(data.error);
-                } else {
-                    replaceRow(data.results[0]);
-                }
-            })
-            .catch(error => {
-                alert('Unable to retrieve updated data:', error);
-            });
-        } else {
-            alert('No such folder to refresh.');
-        }
-    })
-    .catch(error => {
-        alert('Unable to refresh folder stats:', error);
-    });
+  });
 }
 
-function replaceRow(folder) {
-    const curRow = document.getElementById('row_' + folder.folder_id); 
-    const cols = curRow.querySelectorAll('td');
-    cols[0].innerHTML = folder.folder_id;
-    cols[2].innerHTML = formatGMTToLocal(folder.stats_as_of);
-    cols[3].innerHTML = timeElapsed(folder.stats_as_of);
-    cols[4].innerHTML = folder.subfolder_count;
-    cols[5].innerHTML = folder.file_count;
-    cols[6].innerHTML = folder.video_count;
-    cols[7].innerHTML = folder.audio_count;
-    cols[8].innerHTML = folder.photo_count;
-    cols[9].innerHTML = folder.reviewed_count;
-    cols[10].innerHTML = folder.file_count - folder.reviewed_count;
+function getFileCount(folder_id) {
+  const csrftoken = getCookie("csrftoken");
+  fetch(`/api/get-file-count/${folder_id}/`, {
+    method: "GET",
+    headers: {
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "Media-Type": "video",
+      "X-CSRFToken": csrftoken,
+    },
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      totalFiles = data.result;
+      document.getElementById("detail-file-count").innerHTML =
+        data.result + " files)";
+    })
+    .catch((error) => {
+      console.log(error);
+    });
 }

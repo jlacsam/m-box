@@ -111,7 +111,13 @@ def count_faces(cursor, file_id):
 def insert_face(cursor, face_data, file_id):
     face_data = face_data.copy()
     face_data.pop('face_id', None)  # Remove face_id as it will be auto-generated
-    face_data.pop('person_id', None)  # Remove person_id as it will be auto-generated
+
+    # Fetch the person record with the corresponding person_uuid
+    cursor.execute("SELECT person_id FROM mbox_person WHERE person_uuid = %s::uuid", (face_data['person_uuid'],))
+    person = cursor.fetchone()
+    person_id = person[0] if person else None
+
+    face_data['person_id'] = person_id
     face_data['file_id'] = file_id
     face_data = {k: adapt_dict(v) for k, v in face_data.items()}
 
@@ -132,7 +138,13 @@ def count_voices(cursor, file_id):
 def insert_voice(cursor, voice_data, file_id):
     voice_data = voice_data.copy()
     voice_data.pop('voice_id', None)  # Remove voice_id as it will be auto-generated
-    voice_data.pop('person_id', None)  # Remove person_id as it will be auto-generated
+
+    # Fetch the person record with the corresponding person_uuid
+    cursor.execute("SELECT person_id FROM mbox_person WHERE person_uuid = %s::uuid", (face_data['person_uuid'],))
+    person = cursor.fetchone()
+    person_id = person[0] if person else None
+
+    voice_data['person_id'] = person_id
     voice_data['file_id'] = file_id
     voice_data = {k: adapt_dict(v) for k, v in voice_data.items()}
 

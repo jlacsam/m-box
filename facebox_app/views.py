@@ -415,7 +415,7 @@ def get_thumbnail(request, file_id):
             f.seek(file.thumbnail_offset)
             temp = f.read(4)
             thumbnail_size = struct.unpack('<I', temp)[0]
-            print(f"Reading {thumbnail_size} bytes from {thumbnails.path} starting {file.thumbnail_offset+4} for file_id={file_id}, name={file.name}")
+            #print(f"Reading {thumbnail_size} bytes from {thumbnails.path} starting {file.thumbnail_offset+4} for file_id={file_id}, name={file.name}")
             f.seek(file.thumbnail_offset + 4)  # Skip the size bytes
             jpeg_thumbnail = f.read(thumbnail_size)
             
@@ -922,13 +922,14 @@ def search_person(request):
     # Search for matching records in the database
     labels = ['person_id', 'full_name', 'last_name', 'first_name', 'middle_name', 'birth_country', 'birth_city',
         'birth_date', 'face', 'box', 'pose', 'quality', 'gender', 'age_range', 'confidence', 'face_id', 
-        'file_name', 'file_url', 'time_start', 'time_end'];
+        'file_name', 'file_url', 'time_start', 'time_end', 'face_ref'];
     rows = []
     if video_list == "0":
         query = """
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
-                fp.confidence, fp.face_id, fl.name AS file_name, fl.file_url, MIN(ff.time_start), MAX(ff.time_end)
+                fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
+                MIN(ff.time_start), MAX(ff.time_end), fp.face_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
@@ -945,7 +946,8 @@ def search_person(request):
         query = """
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
-                fp.confidence, fp.face_id, fl.name AS file_name, fl.file_url, MIN(ff.time_start), MAX(ff.time_end)
+                fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
+                MIN(ff.time_start), MAX(ff.time_end), fp.face_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND ff.file_id IN (%s) AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 

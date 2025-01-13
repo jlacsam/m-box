@@ -258,7 +258,6 @@ function updateFile() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json',
         },
         body: JSON.stringify(pair)
     })
@@ -316,6 +315,21 @@ function getMedia(file_id) {
     });
 }
 
+
+function cleanVTTContent(vttText) {
+    return vttText
+        // Remove WEBVTT header
+        .replace('WEBVTT\n', '')
+        // Split by timestamp patterns
+        .split(/\d{2}:\d{2}:\d{2}\.\d{3}\s-->\s\d{2}:\d{2}:\d{2}\.\d{3}/)
+        // Remove empty lines and trim each section
+        .map(section => section.split('\n').filter(line => line.trim()).join(' ').trim())
+        // Remove empty sections
+        .filter(section => section)
+        // Join with newlines
+        .join('\n');
+}
+
 function updateTranscript() {
     const editable = document.getElementById(editorText.getAttribute('original-id'));
     let timeref = editable.dataset.cuestart + ' --> ' + editable.dataset.cueend;
@@ -334,7 +348,6 @@ function updateTranscript() {
             'Subscription-ID': SUBSCRIPTION_ID,
             'Client-Secret': CLIENT_SECRET,
             'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/json',
         },
         body: JSON.stringify(triple)
     })
@@ -529,26 +542,40 @@ function showMedia(data) {
 }
 
 function showDetails(data) {
-    document.getElementById('detail-file-name').innerHTML = data.file_name;
-    document.getElementById('detail-folder-name').innerHTML = data.folder_name;
-    document.getElementById('detail-file-type').innerHTML = data.file_type;
-    document.getElementById('detail-media-type').innerHTML = data.media_source;
-    document.getElementById('detail-file-size').innerHTML = data.size;
-    document.getElementById('detail-created').innerHTML = data.date_created
-    document.getElementById('detail-uploaded').innerHTML = data.date_uploaded;
-    document.getElementById('detail-description').innerHTML = data.description;
-    document.getElementById('detail-tags').innerHTML = data.tags;
-    document.getElementById('detail-people').innerHTML = data.people;
-    document.getElementById('detail-places').innerHTML = data.places;
-    document.getElementById('detail-texts').innerHTML = data.texts;
-    document.getElementById('detail-accessed').innerHTML = data.last_accessed;
-    document.getElementById('detail-owner_name').innerHTML = data.owner_name;
-    document.getElementById('detail-group_name').innerHTML = data.group_name;
-    document.getElementById('detail-remarks').innerHTML = data.remarks;
-    document.getElementById('detail-version').innerHTML = data.version;
-    document.getElementById('detail-attributes').innerHTML = data.attributes;
-    document.getElementById('detail-extra_data').innerHTML = data.extra_data;
-    document.getElementById('detail-status').innerHTML = data.file_status;
+    const attibutes = JSON.parse(data.attributes);
+    videoLength = parseFloat(attibutes["length"])   
+    const formattedTime = formatTime(videoLength)
+    attibutes.length = formattedTime
+    document.getElementById('detail-title').innerHTML = data.title == null ? "&nbsp;" : data.title;
+    document.getElementById('detail-creator').innerHTML = data.creator == null ? "&nbsp;" : data.creator;
+    document.getElementById('detail-subject').innerHTML = data.subject == null ? "&nbsp;" : data.subject;
+    document.getElementById('detail-publisher').innerHTML = data.publisher == null ? "&nbsp;" : data.publisher;
+    document.getElementById('detail-contributor').innerHTML = data.contributor == null ? "&nbsp;" : data.contributor;
+    document.getElementById('detail-language').innerHTML = data.language == null ? "&nbsp;" : data.language;
+    document.getElementById('detail-coverage').innerHTML = data.coverage == null ? "&nbsp;" : data.coverage;
+    document.getElementById('detail-relation').innerHTML = data.relation == null ? "&nbsp;" : data.relation;
+    document.getElementById('detail-rights').innerHTML = data.rights == null ? "&nbsp;" : data.rights;
+    document.getElementById('detail-identifier').innerHTML = data.identifier == null ? "&nbsp;" : data.identifier;
+    document.getElementById('detail-file-name').innerHTML = data.file_name == null ? "&nbsp;" : data.file_name;
+    document.getElementById('detail-folder-name').innerHTML = data.folder_name == null ? "&nbsp;" : data.folder_name;
+    document.getElementById('detail-file-type').innerHTML = data.file_type == null ? "&nbsp;" : data.file_type;
+    document.getElementById('detail-media-type').innerHTML = data.media_source == null ? "&nbsp;" : data.media_source;
+    document.getElementById('detail-file-size').innerHTML = data.size == null ? "&nbsp;" : data.size;
+    document.getElementById('detail-created').innerHTML = data.date_created == null ? "&nbsp;" : data.date_created;
+    document.getElementById('detail-uploaded').innerHTML = data.date_uploaded == null ? "&nbsp;" : data.date_uploaded;
+    document.getElementById('detail-description').innerHTML = data.description == null ? "&nbsp;" : data.description;
+    document.getElementById('detail-tags').innerHTML = data.tags == null ? "&nbsp;" : data.tags;
+    document.getElementById('detail-people').innerHTML = data.people == null ? "&nbsp;" : data.people;
+    document.getElementById('detail-places').innerHTML = data.places == null ? "&nbsp;" : data.places;
+    document.getElementById('detail-texts').innerHTML = data.texts == null ? "&nbsp;" : data.texts;
+    document.getElementById('detail-accessed').innerHTML = data.last_accessed == null ? "&nbsp;" : data.last_accessed;
+    document.getElementById('detail-owner_name').innerHTML = data.owner_name == null ? "&nbsp;" : data.owner_name;
+    document.getElementById('detail-group_name').innerHTML = data.group_name == null ? "&nbsp;" : data.group_name;
+    document.getElementById('detail-remarks').innerHTML = data.remarks == null ? "&nbsp;" : data.remarks;
+    document.getElementById('detail-version').innerHTML = data.version == null ? "&nbsp;" : data.version;
+    document.getElementById('detail-attributes').innerHTML = JSON.stringify(attibutes);
+    document.getElementById('detail-extra_data').innerHTML = data.extra_data == null ? "&nbsp;" : data.extra_data;
+    document.getElementById('detail-status').innerHTML = data.file_status == null ? "&nbsp;" : data.file_status;
 }
 
 function showTranscript(file_id) {
@@ -685,6 +712,7 @@ function getAudit(file_id) {
         }
     })
     .catch(error => {
+        console.log(error)
         alert('Unable to save data. Error:', error);
     });
 }
@@ -706,13 +734,61 @@ function displayAudit(results) {
         <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
         <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
         <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
-        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></p>
-        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></p>
+        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.new_data, item.old_data)}</pre></p>
+        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.old_data, item.new_data)}</pre></p>
         <hr></td></tr>`;
     });
 
     auditLog.innerHTML = html;
 }
+function highlightJsonChanges(oldData, newData) {
+    const oldObj = typeof oldData === 'string' ? JSON.parse(oldData) : oldData;
+    const newObj = typeof newData === 'string' ? JSON.parse(newData) : newData;
+    
+    function highlightStringDiff(oldStr, newStr) {
+        oldStr = String(oldStr || '');
+        newStr = String(newStr || '');
+        
+        let result = '';
+        let highlightStarted = false;
+        
+        for (let i = 0; i < newStr.length; i++) {
+            if (newStr[i] !== oldStr[i]) {
+                if (!highlightStarted) {
+                    result += '<span style="background-color: #fff3cd">';
+                    highlightStarted = true;
+                }
+            } else {
+                if (highlightStarted) {
+                    result += '</span>';
+                    highlightStarted = false;
+                }
+            }
+            result += newStr[i];
+        }
+        
+        if (highlightStarted) {
+            result += '</span>';
+        }
+        
+        return result;
+    }
+
+    const result = {};
+    Object.keys(newObj).forEach(key => {
+        if (oldObj[key] !== newObj[key]) {
+            result[key] = highlightStringDiff(oldObj[key], newObj[key]);
+        } else {
+            result[key] = newObj[key];
+        }
+    });
+    
+    return JSON.stringify(result, null, 2)
+        .replace(/"<span[^>]*>(.*?)<\/span>"/g, '<span style="background-color: #fff3cd">$1</span>')
+        .replace(/\\n/g, '\n')
+        .replace(/\\/g, '');
+}
+
 
 function browseFolder(parent_id = 1) {
 
@@ -835,4 +911,79 @@ function selectFolder(folder) {
         getFileCount(folder.folder_id);
     });
 }
+
+
+function convertTableToText() {
+    const table = document.getElementById('vtt-table');
+    console.log('Table element:', table); // Check if table is found
+
+    let textContent = '';
+
+    // Get all rows except header
+    const rows = table.querySelectorAll('tr');
+    console.log('Number of rows found:', rows.length); // Check number of rows
+    
+    const dataRows = Array.from(rows).slice(1); // Skip header row
+    console.log('Number of data rows:', dataRows.length); // Check number of data rows
+    
+    dataRows.forEach((row, index) => {
+        console.log(`Processing row ${index + 1}`); // Track row processing
+        
+        const cells = row.querySelectorAll('td');
+        console.log(`Number of cells in row ${index + 1}:`, cells.length, cells);
+        
+        // Get the cell containing p tags (third column)
+        const cell = cells[0];
+        console.log(`Cell content for row ${index + 1}:`, cell?.innerHTML);
+        
+        if (cell) {
+            // Get all p tags within the cell
+            const paragraphs = cell.querySelectorAll('p');
+            console.log(`Number of paragraphs in row ${index + 1}:`, paragraphs.length);
+            
+            // Extract text from each p tag
+            paragraphs.forEach((p, pIndex) => {
+                const text = p.textContent.trim();
+                console.log(`Paragraph ${pIndex + 1} text:`, text);
+                
+                if (text && text !== 'undefined') {
+                    textContent += `${text}\n`;
+                }
+            });
+        }
+    });
+
+    console.log('Final text content:', textContent); // Check final output
+    return textContent;
+}
+
+function formatTime(seconds) {
+    const sign = seconds < 0 ? '-' : '';
+    seconds = Math.abs(seconds);
+    
+    return sign + new Date(seconds * 1000).toISOString().slice(11, 23);
+}
+
+// Add click event to download button
+document.getElementById('download-transcript').addEventListener('click', function() {
+    console.log('Download button clicked'); // Verify click handler is working
+    const textContent = convertTableToText();
+    const cleanedText = cleanVTTContent(textContent);
+    if (!cleanedText) {
+        console.log('No text content generated');
+        alert('No content found to download');
+        return;
+    }
+    
+    // Create and trigger download
+    const blob = new Blob([cleanedText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transcript.txt';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+});
 
