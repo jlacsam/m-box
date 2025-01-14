@@ -243,11 +243,6 @@ a:visited {
   transform: translate(26px, -50%);
 }
 
-/* When the checkbox is checked, move the knob to the right */
-.switch input:checked + .slider-tile:before {
-  transform: translateX(26px);
-}
-
 .tile_table {
   border: 0px;
   border-radius: 15px;

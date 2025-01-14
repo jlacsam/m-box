@@ -1,3 +1,4 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path
 from . import views, apis
 
@@ -6,6 +7,8 @@ urlpatterns = [
     path('', views.app_login, name='app_login'),
     path('login/', views.app_login, name='app_login'),
     path('logout/', views.app_logout, name='app_logout'),
+    path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
+    path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
     path('search/', views.search_face, name='search_face'),
     path('faces/', views.face_search, name='face_search'),
     path('voices/', views.voice_search, name='voice_search'),
