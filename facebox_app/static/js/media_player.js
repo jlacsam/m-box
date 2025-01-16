@@ -345,7 +345,7 @@ function updateTranscript() {
     triple['newstr'] = newstr;
 
     const csrftoken = getCookie('csrftoken');
-    fetch(`/api/update-transcript-segment/${q_file_id}/`, {
+    fetch(`/api/update-transcript-segment/${selectedFile}/`, {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
@@ -732,15 +732,17 @@ function displayAudit(results) {
 
     let html = '<table><tr><td><p style="font-weight:bold; color:black;">AUDIT LOG</p><br></td></tr>';
     results.forEach(item => {
-        html += `<tr><td>
-        <p class='audit-detail'>${item.audit_id} (${item.record_id})</p>
-        <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
-        <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
-        <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
-        <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
-        <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.new_data, item.old_data)}</pre></p>
-        <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.old_data, item.new_data)}</pre></p>
-        <hr></td></tr>`;
+        if (item.activity == 'UPDATE') {
+            html += `<tr><td>
+            <p class='audit-detail'>${item.audit_id} (${item.record_id})</p>
+            <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${item.username}</p>
+            <p class='audit-detail'><span class='audit-key'>Action:</span>&nbsp;${item.activity}</p>
+            <p class='audit-detail'><span class='audit-key'>Timestamp:</span>&nbsp;${item.event_timestamp}</p>
+            <p class='audit-detail'><span class='audit-key'>IP Location:</span>&nbsp;${item.location}</p>
+            <p class='audit-detail'><span class='audit-key'>Old Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.new_data, item.old_data)}</pre></p>
+            <p class='audit-detail'><span class='audit-key'>New Data:</span>&nbsp;<pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${highlightJsonChanges(item.old_data, item.new_data)}</pre></p>
+            <hr></td></tr>`;
+        }
     });
 
     auditLog.innerHTML = html;
@@ -777,6 +779,9 @@ function highlightJsonChanges(oldData, newData) {
         
         return result;
     }
+
+    if (newObj == null)
+        return "";
 
     const result = {};
     Object.keys(newObj).forEach(key => {

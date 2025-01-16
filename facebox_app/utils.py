@@ -9,6 +9,10 @@ from pydub import AudioSegment
 from .models import FbxFile, FbxFolder, FbxAudit
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from functools import wraps
+from rest_framework.response import Response
+from rest_framework import status
+
 
 # Initialize FaceNet model and MTCNN detector
 facenet = FaceNet()
@@ -340,3 +344,56 @@ def update_last_modified(record_id,target='file'):
     except Exception as e:
         print(f"Error occurred: {e}")
 
+
+# Validate subscription ID and client secret decorator #############################################
+def validate_subscription_headers(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        # Extract subscription headers
+        subscription_id = request.headers.get('Subscription-ID')
+        client_secret = request.headers.get('Client-Secret')
+
+        # Check if required headers are present
+        if not subscription_id or not client_secret:
+            return Response(
+                {
+                    'error': 'Missing required headers: Subscription-ID and/or Client-Secret'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Validate the subscription
+        if not validate_subscription(subscription_id, client_secret):
+            return Response(
+                {
+                    'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # If validation passes, proceed with the view function
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+# Override file_url with mbox url to prevent direct user access to the media assets ################
+def override_file_url(records, labels):
+    try:
+        file_id_index = labels.index('file_id')
+        file_url_index = labels.index('file_url')
+
+        # Convert records to a list of lists if it contains tuples
+        temp_records = [list(record) for record in records]
+
+        for record in temp_records:
+            file_id = record[file_id_index]
+            record[file_url_index] = f"/api/get-presigned-url/{file_id}/"
+
+        # Convert back to tuples if needed
+        results = [tuple(record) for record in temp_records]
+        return results
+
+    except ValueError:
+        print("WARNING: Unable to replace AWS S3/Azure Blob Storage URLs with m-box URLs.")
+        return records

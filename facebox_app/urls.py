@@ -48,6 +48,7 @@ urlpatterns = [
     path('delete-folder/<int:folder_id>/', apis.delete_folder, name='delete_folder'),
     path('get-file-count/<int:folder_id>/', apis.get_file_count, name='get_file_count'),
     path('get-file-position/<int:file_id>/', apis.get_file_position, name='get_file_position'),
+    path('get-presigned-url/<int:file_id>/', apis.get_presigned_url, name='get_presigned_url'),
     path('merge-persons/<int:person_id>/', apis.merge_persons, name='merge_persons'),
     path('move-file/<int:file_id>/<int:target_folder>/', apis.move_file, name='move_file'),
     path('move-folder/<int:folder_id>/<int:target_folder>/', apis.move_folder, name='move_folder'),

@@ -419,6 +419,7 @@ function unLinkFaces(person_id, unlinkPerson) {
   fetch(`/api/unlink-faces/${person_id}/`, {
     method: "PATCH",
     headers: {
+      "Content-Type": "application/json",
       "Subscription-ID": SUBSCRIPTION_ID,
       "Client-Secret": CLIENT_SECRET,
       "X-CSRFToken": csrftoken,
@@ -532,6 +533,8 @@ function searchFaces() {
   const formData = new FormData();
   formData.append("image", uploadedImage);
 
+  document.body.style.cursor = 'wait';
+
   fetch("/api/search/", {
     method: "POST",
     headers: {
@@ -556,9 +559,11 @@ function searchFaces() {
         updateResultsLabel();
         trackLastFace(data);
       }
+      document.body.style.cursor = 'default';
     })
     .catch((error) => {
       results.innerHTML = `<p>ERROR: ${error.message}</p>`;
+      document.body.style.cursor = 'default';
     });
 }
 
@@ -1207,6 +1212,7 @@ function saveEdits() {
   fetch(`/api/update-person/${person_id}/`, {
     method: "PATCH",
     headers: {
+      "Content-Type": "application/json",
       "Subscription-ID": SUBSCRIPTION_ID,
       "Client-Secret": CLIENT_SECRET,
       "X-CSRFToken": csrftoken,
@@ -1294,7 +1300,7 @@ function displayAudit(results) {
   let html =
     '<table><tr><td><p style="font-weight:bold; color:black;">AUDIT LOG</p><br></td></tr>';
   results.forEach((item) => {
-    html += `<tr><td>
+      html += `<tr><td>
         <p class='audit-detail'>${item.audit_id} (${item.record_id})</p>
         <p class='audit-detail'><span class='audit-key'>Username:</span>&nbsp;${
           item.username

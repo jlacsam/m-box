@@ -64,14 +64,15 @@ def create_folder(conn, folder, parent_folder=None):
     cursor.close()
     return folder_id
 
-def add_media(conn, folder_id, filename, media_type):
+def add_media(conn, folder_name, folder_id, filename, media_type):
     cursor = conn.cursor()
     extension = os.path.splitext(filename)[1]
+    storage_key = folder_name + '/' + filename
     insert_query = """
-        INSERT INTO mbox_file (folder_id,name,extension,media_type)
-        VALUES (%s, %s, %s, %s) RETURNING file_id;
+        INSERT INTO mbox_file (folder_id,name,extension,storage_key,media_type)
+        VALUES (%s, %s, %s, %s, %s) RETURNING file_id;
     """
-    cursor.execute(insert_query, (folder_id, filename, extension, media_type))
+    cursor.execute(insert_query, (folder_id, filename, extension, storage_key, media_type))
     file_id = cursor.fetchone()[0]
     cursor.close()
     return file_id
@@ -210,7 +211,7 @@ def upload_to_db(conn, data_dir, container, folder):
 
             # Insert a new record in the mbox_file table
             print(f"Adding {path_name}/{media_file} ...")
-            file_id = add_media(conn, folder_id, media_file, media_type)
+            file_id = add_media(conn, folder, folder_id, media_file, media_type)
             count_inserted += 1
         else:
             file_id = record[0]

@@ -223,7 +223,7 @@ function displayAudit(results) {
             <td>${item.activity}</td>
             <td>${formatDate(item.event_timestamp)}</td>
             <td>${item.location == null ? '-' : item.location}</td>
-            <td>${item.table_name == null ? '-' : item.table_name.substring(4)}</td>
+            <td>${item.table_name == null ? '-' : item.table_name.substring(5)}</td>
             <td>${item.record_id == null ? '-' : item.record_id}</td>
             <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.old_data)}</pre></td>
             <td><pre class="json-highlight" style="display: inline; white-space: pre-wrap; word-wrap: break-word;">${formatJsonString(item.new_data)}</pre></td>

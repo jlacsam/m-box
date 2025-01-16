@@ -14,33 +14,26 @@ from django.db import connection
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
 from azure.storage.blob import BlobServiceClient
 
-from .utils import get_face_embedding, get_voice_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed
+from .utils import get_face_embedding, get_voice_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
 from .models import FbxFace, FbxFile, FbxThumbnail, FbxFolder
 
 
 # Search the mbox_face table ########################################################################
-@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def search_face(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     similarity = request.headers.get('Similarity')
     max_rows = request.headers.get('Max-Rows')
     video_list = request.headers.get('Video-List')
     start_from = request.headers.get('Start-From')
    
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     # Check if an image is provided
     if 'image' not in request.FILES:
         return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -99,15 +92,18 @@ def search_face(request):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'SEARCH FACE','mbox_face',last_face_id,None,None,get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get the faces linked to the given person #####################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_linked_faces(request,person_id):
@@ -165,15 +161,18 @@ def get_linked_faces(request,person_id):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'GET LINKED FACES','mbox_face',person_id,None,None,get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Search the mbox_voice table using an audio file ###################################################
-@csrf_exempt
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
 def search_voice(request):
@@ -245,8 +244,12 @@ def search_voice(request):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'SEARCH VOICE','mbox_voice',last_voice_id,None,None,get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
@@ -255,7 +258,6 @@ def search_voice(request):
 ####################################################################################################
 # Search the mbox_voice table using a reference to a segment from another audio file that is already 
 # stored in the mbox_table and has records in the mbox_voice table
-@csrf_exempt
 @permission_classes([IsAuthenticated])
 @api_view(['GET'])
 def search_voice_by_ref(request,voice_id):
@@ -320,25 +322,22 @@ def search_voice_by_ref(request,voice_id):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'SEARCH VOICE BY REF','mbox_voice',last_voice_id,None,None,get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get a jpeg thumbnail for a face ##################################################################
-@csrf_exempt
-@permission_classes([IsAuthenticated])
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_face_image(request, face_id):
-    # Retrieve headers
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    # Validate subscription
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         # Query the database
@@ -355,7 +354,6 @@ def get_face_image(request, face_id):
             f.seek(face.thumbnail_offset)
             temp = f.read(4)
             thumbnail_size = struct.unpack('<I', temp)[0]
-            print(f"Reading {thumbnail_size} bytes from {thumbnails.path} starting {face.thumbnail_offset+4} for face_id={face_id}")
             f.seek(face.thumbnail_offset + 4)  # Skip the size bytes
             jpeg_thumbnail = f.read(thumbnail_size)
             
@@ -384,17 +382,10 @@ def get_face_image(request, face_id):
 
 
 # Get a jpeg thumbnail for a file ##################################################################
-@csrf_exempt
-@permission_classes([IsAuthenticated])
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_thumbnail(request, file_id):
-    # Retrieve headers
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    # Validate subscription
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         #Query the database
@@ -442,22 +433,16 @@ def get_thumbnail(request, file_id):
 
 
 # Search the mbox_file table for videos #############################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def search_media(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     max_rows = request.headers.get('Max-Rows')
     start_from = request.headers.get('Start-From')
     pattern = request.headers.get('Pattern')
     scope = request.headers.get('Scope')
     media_type = request.headers.get('Media-Type')
    
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     offset = 0
     if start_from is not None:
         offset = start_from
@@ -540,8 +525,12 @@ def search_media(request):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'SEARCH MEDIA','mbox_file',0,None,str(params),get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
@@ -552,18 +541,13 @@ def search_media(request):
 ################################################################################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_recycle_bin(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     max_rows = request.headers.get('Max-Rows')
     start_from = request.headers.get('Start-From')
     pattern = request.headers.get('Pattern')
     scope = request.headers.get('Scope')
     media_type = request.headers.get('Media-Type')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     offset = 0
     if start_from is not None:
@@ -647,25 +631,23 @@ def get_recycle_bin(request):
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'GET RECYCLE BIN','mbox_file',0,None,str(params),get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get a file from the mbox_file table ###############################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_media(request, file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
    
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     # Search for matching records in the database
     labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 
         'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 
@@ -692,33 +674,29 @@ def get_media(request, file_id):
     # Close database connection
     cursor.close()
 
-    # Update the last_accessed field 
+    # Update the last_accessed field, Insert an audit record for this action 
     if len(rows):
+        insert_audit(request.user.username,'GET MEDIA','mbox_file',file_id,None,None,get_client_ip(request))
         update_last_accessed(file_id)
 
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get previous or next file from the mbox_file table ################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_adjacent_media(request, file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     direction = request.headers.get('Direction')
     media_type = request.headers.get('Media-Type') 
     folder_id = request.headers.get('Folder-ID')
     skip_status = request.headers.get('Skip-Status')
  
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     # Search for matching records in the database
     labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 'file_url', 
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 'texts', 
@@ -766,27 +744,24 @@ def get_adjacent_media(request, file_id):
 
     # Update the last_accessed field
     if len(rows): 
-        update_last_accessed(rows[0][0])
+        adjacent_file_id = rows[0][0]
+        insert_audit(request.user.username,'GET MEDIA','mbox_file',adjacent_file_id,None,None,get_client_ip(request))
+        update_last_accessed(adjacent_file_id)
 
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get a folder from the mbox_folder table ###########################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_folder(request, folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
    
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     # Search for matching records in the database
     labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
@@ -811,8 +786,9 @@ def get_folder(request, folder_id):
     # Close database connection
     cursor.close()
 
-    # Update the last_accessed field
+    # Update the last_accessed field, Insert an audit record for this action 
     if len(rows): 
+        insert_audit(request.user.username,'GET FOLDER','mbox_folder',folder_id,None,None,get_client_ip(request))
         update_last_accessed(folder_id,'folder')
 
     # Serialize the results and return the response
@@ -823,16 +799,10 @@ def get_folder(request, folder_id):
 
 
 # Get folders from the mbox_folder table ############################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_folders(request, parent_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-   
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Search for matching records in the database
     labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
@@ -864,8 +834,9 @@ def get_folders(request, parent_id):
     # Close database connection
     cursor.close()
 
-    # Update the last_accessed field
-    if len(rows): 
+    # Update the last_accessed field, insert audit record for this action
+    if len(rows) and parent_id > 0: 
+        insert_audit(request.user.username,'GET FOLDERS','mbox_folder',parent_id,None,None,get_client_ip(request))
         update_last_accessed(parent_id,'folder')
 
     # Serialize the results and return the response
@@ -876,16 +847,10 @@ def get_folders(request, parent_id):
 
 
 # Get groups of the specified user ################################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_groups(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     groups = list(request.user.groups.all())
     for i, group in enumerate(groups):
@@ -900,19 +865,13 @@ def get_groups(request):
 
 
 # Search the mbox_person table ######################################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def search_person(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     video_list = request.headers.get('Video-List')
     max_rows = request.headers.get('Max-Rows')
     start_from = request.headers.get('Start-From')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     last_person_id = 0
     if start_from is not None:
@@ -921,69 +880,68 @@ def search_person(request):
 
     # Search for matching records in the database
     labels = ['person_id', 'full_name', 'last_name', 'first_name', 'middle_name', 'birth_country', 'birth_city',
-        'birth_date', 'face', 'box', 'pose', 'quality', 'gender', 'age_range', 'confidence', 'face_id', 
-        'file_name', 'file_url', 'time_start', 'time_end', 'face_ref'];
+        'birth_date', 'box', 'pose', 'quality', 'gender', 'age_range', 'confidence', 'face_id', 
+        'file_name', 'file_url', 'time_start', 'time_end', 'face_ref', 'file_id'];
     rows = []
     if video_list == "0":
         query = """
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
-                fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
+                fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
-                MIN(ff.time_start), MAX(ff.time_end), fp.face_id
+                MIN(ff.time_start), MAX(ff.time_end), fp.face_id, fl.file_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
-                fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
-                fp.confidence, fp.face_id, fl.name, fl.file_url
+                fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
+                fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
             ORDER BY fp.person_id ASC
             LIMIT %s
         """
         with connection.cursor() as cursor:
-            cursor.execute(query, (last_person_id, max_rows))
+            params = (last_person_id, max_rows)
+            cursor.execute(query, params)
             rows = cursor.fetchall()
 
     else:
         query = """
             SELECT fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
-                fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
+                fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
-                MIN(ff.time_start), MAX(ff.time_end), fp.face_id
+                MIN(ff.time_start), MAX(ff.time_end), fp.face_id, fl.file_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
             WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND ff.file_id IN (%s) AND fp.person_id > %s 
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
-                fp.birth_city, fp.birth_date, fp.face, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
-                fp.confidence, fp.face_id, fl.name, fl.file_url
+                fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
+                fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
             ORDER BY fp.person_id ASC
             LIMIT %s
         """
 
         with connection.cursor() as cursor:
-            cursor.execute(query, (video_list, last_person_id, max_rows))
+            params = (video_list, last_person_id, max_rows)
+            cursor.execute(query, params)
             rows = cursor.fetchall()
 
     # Close database connection
     cursor.close()
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'SEARCH PERSON','mbox_person',0,None,str(params),get_client_ip(request))
+
     # Serialize the results and return the response
     if len(rows):
+        rows = override_file_url(rows, labels)
         return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
     else:
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Get transcript of a file #########################################################################
-@csrf_exempt
-@permission_classes([IsAuthenticated])
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_transcript(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     max_rows = request.headers.get('Max-Rows')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
-
     labels = ['file_id','webvtt']
     query = "SELECT file_id, webvtt FROM mbox_file WHERE file_id = %s"
     
@@ -1005,18 +963,12 @@ def get_transcript(request,file_id):
 
 
 # Get audit records for a file #####################################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_audit(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     max_rows = request.headers.get('Max-Rows')
     table_name = request.headers.get('Source-Table')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Search for matching records in the database
     labels = ['audit_id', 'username', 'activity', 'event_timestamp', 'location', 'table_name', 
@@ -1060,20 +1012,14 @@ def get_audit(request,file_id):
 
 
 # Search audit records #############################################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def search_audit(request):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     max_rows = request.headers.get('Max-Rows')
     username = request.headers.get('Username')
     start_date = request.headers.get('Start-Date')
     end_date = request.headers.get('End-Date')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Search for matching records in the database
     labels = ['audit_id', 'username', 'activity', 'event_timestamp', 'location', 'table_name', 
@@ -1104,16 +1050,10 @@ def search_audit(request):
 
 
 # Get segments of speech aka diaries of a file #####################################################
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_diary(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Search for matching records in the database
     labels = ['voice_id', 'file_id', 'person_id', 'speaker', 'time_start', 'time_end',
@@ -1134,8 +1074,9 @@ def get_diary(request,file_id):
     # Close database connection
     cursor.close()
 
-    # Update the last_accessed field
+    # Update the last_accessed field, Insert an audit record for this action 
     if len(rows): 
+        insert_audit(request.user.username,'GET DIARY','mbox_voice',file_id,None,None,get_client_ip(request))
         update_last_accessed(file_id,'file')
 
     # Serialize the results and return the response
@@ -1297,18 +1238,12 @@ def api_tester(request):
 ####################################################################################################
 # The following are for handling streaming the audio fro Azure Blob Storage. #######################
 
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def stream_audio(request, file_id):
 
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     time_offset = float(request.headers.get('Time-Offset'))
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Query the database, get the file record
     file = FbxFile.objects.get(file_id=file_id)
@@ -1339,7 +1274,9 @@ def stream_audio(request, file_id):
         for chunk in stream.chunks():
             yield chunk
 
-    # Update the last_accessed field
+    # Update the last_accessed field, insert audit record for this action
+    insert_audit(request.user.username,'STREAM AUDIO','mbox_voice',file_id,None,
+                 str(time_offset),get_client_ip(request))
     update_last_accessed(file_id,'file')
 
     # Return the StreamingHttpResponse with the appropriate content

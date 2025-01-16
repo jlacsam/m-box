@@ -214,9 +214,14 @@ AUTH_ADFS = {
 }
 
 AZURE_CONNECTION_STRING = os.environ.get('AZURE_CONNECTION_STRING')
+AWS_DEFAULT_REGION = os.environ.get('AWS_DEFAULT_REGION')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 MBOX_EDITORS_GROUP = os.environ.get('MBOX_EDITORS_GROUP')
 MBOX_SUPERVISORS_GROUP = os.environ.get('MBOX_SUPERVISORS_GROUP')
 MBOX_DEVELOPERS_GROUP = os.environ.get('MBOX_DEVELOPERS_GROUP')
+MBOX_URL_EXPIRATION = os.environ.get('MBOX_URL_EXPIRATION')
 REST_USE_JWT = True
 
 LOGIN_URL = '/login/'
@@ -268,6 +273,11 @@ LOGGING = {
            'django.db.backends': {
                'handlers': ['file'],
                'level': os.environ.get('MBOX_BACKENDS_LOGLEVEL'),
+               'propagate': False,
+           },
+           'django.security.Authentication': {
+               'handlers': ['file'],
+               'level': 'INFO',
                'propagate': False,
            },
            'mbox': {

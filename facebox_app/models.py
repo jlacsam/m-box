@@ -57,6 +57,7 @@ class FbxFile(models.Model):
     file_id = models.AutoField(primary_key=True)
     folder = models.ForeignKey('FbxFolder', models.DO_NOTHING)
     name = models.CharField(max_length=64)
+    storage_key = models.CharField(max_length=255)
     extension = models.CharField(max_length=16)
     media_type = models.CharField(max_length=16, blank=True, null=True)
     media_source = models.CharField(max_length=16, blank=True, null=True)

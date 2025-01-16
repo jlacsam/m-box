@@ -1,8 +1,9 @@
 import os
+import boto3
 
 from django.conf import settings
 from django.db import connection
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
 from django.core.files.storage import default_storage
@@ -12,19 +13,15 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified
+from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers
 from .models import FbxFile, FbxFolder, FbxPerson
+
 
 # Create Folder ####################################################################################
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def create_folder(request,parent_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,parent_id,'add'):
         return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
@@ -60,20 +57,18 @@ def create_folder(request,parent_id):
     except Exception as e:
         return Response({'error':f'{e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'CREATE FOLDER','mbox_folder',parent_id,None,name,get_client_ip(request))
+    update_last_modified(parent_id,'folder')
+
     return Response({'result':f'{folder.folder_id}'}, status=status.HTTP_200_OK)
 
 
 # Rename Folder ####################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def rename_folder(request,folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to update the folder record
     if not check_folder_permission(request,folder_id,'rename'):
@@ -113,13 +108,8 @@ def rename_folder(request,folder_id):
 # Rename File ######################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def rename_file(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'rename'):
@@ -144,13 +134,8 @@ def rename_file(request,file_id):
 # Set Folder Owner #################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_folder_owner(request,folder_id,owner_name):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_owner'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -181,13 +166,8 @@ def set_folder_owner(request,folder_id,owner_name):
 # Set File Owner ###################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_file_owner(request,file_id,owner_name):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_owner'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -218,13 +198,8 @@ def set_file_owner(request,file_id,owner_name):
 # Set Folder Group #################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_folder_group(request,folder_id,group_name):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_group'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -252,13 +227,8 @@ def set_folder_group(request,folder_id,group_name):
 # Set File Group ###################################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_file_group(request,file_id,group_name):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_group'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -295,13 +265,8 @@ def set_file_group(request,file_id,group_name):
 # Set Folder Permission ############################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_folder_permission(request,folder_id,owner_rights,group_rights,domain_rights,public_rights):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'set_permission'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -337,13 +302,8 @@ def set_folder_permission(request,folder_id,owner_rights,group_rights,domain_rig
 # Set File Permission ##############################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def set_file_permission(request,file_id,owner_rights,group_rights,domain_rights,public_rights):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'set_permission'):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
@@ -379,13 +339,8 @@ def set_file_permission(request,file_id,owner_rights,group_rights,domain_rights,
 # Unlink two or more faces from a person ###########################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def unlink_faces(request, person_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if user is a member of the editors group
     groups = request.user.groups.all()
@@ -420,13 +375,8 @@ def unlink_faces(request, person_id):
 # Move folder to another parent ####################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def move_folder(request,folder_id,target_folder):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     folder = get_object_or_404(FbxFolder, folder_id=folder_id)
     old_parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
@@ -470,13 +420,8 @@ def move_folder(request,folder_id,target_folder):
 # Move file from one folder to another #############################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def move_file(request,file_id,target_folder):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, status=status.HTTP_401_UNAUTHORIZED)
 
     file = get_object_or_404(FbxFile, file_id=file_id)
     old_folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
@@ -509,14 +454,8 @@ def move_file(request,file_id,target_folder):
 # Refresh folder statistics ########################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def refresh_folder_stats(request, folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if user is a member of the SUPERVISORS group
     groups = request.user.groups.all()
@@ -531,20 +470,19 @@ def refresh_folder_stats(request, folder_id):
     with connection.cursor() as cursor:
         cursor.execute('CALL refresh_folder_stats(%s, 0)', [folder_id])
         rowcount = cursor.fetchone()[0]
-        return Response({'rowcount':rowcount}, status=status.HTTP_200_OK)
+
+    # Insert audit record for this action
+    insert_audit(request.user.username,'REFRESH FOLDER STATS','mbox_folder',
+                 folder_id,None,None,get_client_ip(request))
+
+    return Response({'rowcount':rowcount}, status=status.HTTP_200_OK)
 
 
 # Mark a folder record as deleted ##################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def delete_folder(request,folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'delete'):
         return Response({'error':'Permission denied. Write and execute permissions ' \
@@ -584,14 +522,8 @@ def delete_folder(request,folder_id):
 # Mark a file record as deleted ####################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def delete_file(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'delete'):
         return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
@@ -620,14 +552,8 @@ def delete_file(request,file_id):
 # Get the number of files in a folder ##############################################################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_file_count(request, folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     query = f"SELECT COUNT(*) FROM mbox_file WHERE NOT is_deleted AND folder_id = %s"
     with connection.cursor() as cursor:
@@ -640,15 +566,9 @@ def get_file_count(request, folder_id):
 # Get the number of files that come before the given file relative to the folder ###################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def get_file_position(request, file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
     folder_id = request.headers.get('Folder-ID')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     query = f"SELECT COUNT(*) FROM mbox_file WHERE NOT is_deleted AND folder_id = %s AND file_id <= %s"
     with connection.cursor() as cursor:
@@ -658,17 +578,49 @@ def get_file_position(request, file_id):
     return Response({'result': position}, status=status.HTTP_200_OK)
 
 
+# Get a presigned url ##############################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_presigned_url(request, file_id, for_streaming=True):
+    # Configure S3 client
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_DEFAULT_REGION
+    )
+    
+    try:
+        # Get file object from database
+        file = FbxFile.objects.get(file_id=file_id)
+        
+        # Generate presigned URL with 24-hour expiration
+        target = "inline" if for_streaming else f"attachment; filename={file['name']}"
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                'Key': file.storage_key,
+                'ResponseContentDisposition': target,
+            },
+            ExpiresIn=settings.MBOX_URL_EXPIRATION # in seconds
+        )
+        
+        insert_audit(request.user.username,'VIEW ASSET','mbox_file',file_id,None,None,get_client_ip(request))
+        update_last_accessed(file_id,'file')
+
+        return redirect(url)
+    except FbxFile.DoesNotExist:
+        return Response({'error': 'File not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
 # Merge two or more persons together ###############################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def merge_persons(request, person_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if user is a member of the editors group
     groups = request.user.groups.all()
@@ -716,14 +668,8 @@ def merge_persons(request, person_id):
 # Restore a deleted folder #########################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def restore_folder(request,folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_folder_permission(request,folder_id,'restore'):
         return Response({'error':'Permission denied. Write and execute permissions ' \
@@ -754,14 +700,8 @@ def restore_folder(request,folder_id):
 # Restore a deleted file ###########################################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def restore_file(request,file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     if not check_file_permission(request,file_id,'restore'):
         return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
@@ -792,14 +732,8 @@ def restore_file(request,file_id):
 # Upload a file ####################################################################################
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def upload_file(request,folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to add a file to the folder
     if not check_folder_permission(request,folder_id,'add'):
@@ -875,15 +809,8 @@ def upload_file(request,folder_id):
 # Update a field of a file in the mbox_file table ###################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def update_file(request, file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    # Check if client app has a valid subscription
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'update'):
@@ -943,15 +870,8 @@ def update_file(request, file_id):
 # Update a field(s) of a folder in the mbox_folder table ###########################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def update_folder(request,folder_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    # Check if client app has a valid subscription
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"}, 
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to do an update on the folder
     if not check_folder_permission(request,folder_id,'update'):
@@ -1009,14 +929,8 @@ def update_folder(request,folder_id):
 # Update a field of a person in the mbox_person table ###############################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def update_person(request, person_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                            status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if user is a member of the editors group
     groups = request.user.groups.all()
@@ -1073,14 +987,8 @@ def update_person(request, person_id):
 # Update a segment of the transcript of a file #####################################################
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@validate_subscription_headers
 def update_transcript_segment(request, file_id):
-    # Extract and validate subscription ID and client secret
-    subscription_id = request.headers.get('Subscription-ID')
-    client_secret = request.headers.get('Client-Secret')
-
-    if not subscription_id or not client_secret or not validate_subscription(subscription_id, client_secret):
-        return Response({'error': f"Invalid subscription ID {subscription_id} or client secret {client_secret}"},
-                        status=status.HTTP_401_UNAUTHORIZED)
 
     # Check if the user has permission to update the file record
     if not check_file_permission(request,file_id,'update'):

@@ -418,6 +418,17 @@
       "status"     : "V1.0"
     },
     {
+      "name"       : "Get Presigned Url",
+      "description": "Get a presigned url for an object stored in AWS S3.",
+      "endpoint"   : "get-presigned-url/<int:file_id>/<bool:for_streaming>/",
+      "method"     : "GET",
+      "headers"    : [ "Subscription-ID", "Client-Secret" ],
+      "parameters" : [ { "name" : "File ID", "type" : "int" }, { "name" : "For Streaming", "type" : "bool" } ],
+      "body"       : null,
+      "outputs"    : [ { "url" : "url" }, { "error" : "Error description" } ],
+      "status"     : "V1.0"
+    },
+    {
       "name"       : "Merge Persons",
       "description": "Merges multiple person records into the person identified by the person_id.",
       "endpoint"   : "merge-persons/<int:person_id>/",
