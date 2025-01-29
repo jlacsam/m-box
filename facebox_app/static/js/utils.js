@@ -63,6 +63,123 @@ function desanitizeHtml(str) {
   return str.replace(/&amp;|&lt;|&gt;|&quot;|&#039;|&nbsp;/g, function(m) { return map[m]; }).trim();
 }
 
+function downloadWordList(url) {
+    const options = {
+        method: 'GET',
+        headers: {
+            'Accept': 'text/plain'
+        },
+        mode: 'cors'
+    };
+
+    return fetch(url, options)
+        .then(response => {
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('text/plain')) {
+                throw new TypeError('File must be a text file!');
+            }
+
+            // Check if the response was successful
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+            }
+
+            return response.text();
+        })
+        .then(text => {
+            // Validate that we received some content
+            if (!text) {
+                throw new Error('File is empty!');
+            }
+
+            // Split the text by commas, trim whitespace, and filter empty entries
+            const wordArray = text.split(',')
+                .map(word => word.trim())
+                .filter(word => word.length > 0);
+
+            // Validate that we got some words
+            if (wordArray.length === 0) {
+                throw new Error('No valid words found in file!');
+            }
+
+            return new Set(wordArray);
+        })
+        .catch(error => {
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                console.error('Network error or CORS issue:', error);
+                throw new Error('Unable to download the file. Check the URL and network connection.');
+            }
+            console.error('Error downloading or processing the file:', error);
+            throw error;
+        });
+}
+
+function expandContractions(input) {
+    const contractionsMap = {
+        "can't": "cannot",
+        "won't": "will not",
+        "shan't": "shall not",
+        "I'm": "I am",
+        "you're": "you are",
+        "we're": "we are",
+        "they're": "they are",
+        "he's": "he is",
+        "she's": "she is",
+        "it's": "it is",
+        "I've": "I have",
+        "you've": "you have",
+        "we've": "we have",
+        "they've": "they have",
+        "he's": "he has",
+        "she's": "she has",
+        "I'd": "I had",
+        "you'd": "you had",
+        "we'd": "we had",
+        "they'd": "they had",
+        "he'd": "he had",
+        "she'd": "she had",
+        "I'll": "I will",
+        "you'll": "you will",
+        "we'll": "we will",
+        "they'll": "they will",
+        "he'll": "he will",
+        "she'll": "she will",
+        "let's": "let us",
+        "who's": "who is",
+        "what's": "what is",
+        "here's": "here is",
+        "there's": "there is",
+        "how's": "how is",
+        "didn't": "did not",
+        "doesn't": "does not",
+        "don't": "do not",
+        "isn't": "is not",
+        "aren't": "are not",
+        "wasn't": "was not",
+        "weren't": "were not",
+        "hasn't": "has not",
+        "haven't": "have not",
+        "hadn't": "had not",
+        "wouldn't": "would not",
+        "couldn't": "could not",
+        "shouldn't": "should not",
+        "mightn't": "might not",
+        "mustn't": "must not"
+    };
+
+    // Use a regular expression to find and replace contractions
+    const regex = new RegExp(Object.keys(contractionsMap).join("|"), "gi");
+
+    return input.replace(regex, (matched) => {
+        // Match case to keep the original capitalization
+        const replacement = contractionsMap[matched.toLowerCase()];
+        return matched[0] === matched[0].toUpperCase()
+            ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+            : replacement;
+    });
+}
+
 function formatDate(dateString) {
     if (dateString == null)
         return "N/A";
@@ -210,11 +327,30 @@ function hasInvalidChars(str) {
 }
 
 function isProperlyQuoted(str) {
-    return /^(['"]).*\1$/.test(str);
+    return /^\s*(['"]).*\1\s*$/.test(str);
 }
 
 function isProperlyQuotedOrUnquoted(str) {
-    return /^(['"]).*\1$|^[^'"].*[^'"]$/.test(str);
+    return /^\s*(['"]).*\1\s*$|^[^'"].*[^'"]$/.test(str);
+}
+
+function isSemantic(str, threshold=0.5) {
+    words = str.split(/\s+/);
+    if (words.length <= 1) return -1;
+
+    const is_properly_quoted = isProperlyQuoted(str);
+    if (is_properly_quoted) return -2;
+
+    const is_invalidly_quoted = !isProperlyQuotedOrUnquoted(str);
+    if (is_invalidly_quoted) return -3;
+
+    const is_valid_ts_query = isValidTsQueryString(str);
+    if (is_valid_ts_query) return -4;
+
+    const capitalized = words.filter(word => /^[A-Z]/.test(word)).length;
+    if (capitalized / words.length > threshold) return -5;
+
+    return 1;
 }
 
 function isValidJPEG(blob) {
@@ -350,6 +486,14 @@ function sanitizeJson(str) {
         return "{}";
     }
     return JSON.stringify(str).replaceAll("\\","").replaceAll('"',"");
+}
+
+function setCookie(name, value, expiration=86400) {
+    var expires = "";
+    var date = new Date();
+    date.setTime(date.getTime() + (expiration * 1000));
+    expires = "; expires=" + date.toUTCString();
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
 
 function timeElapsed(dateString) {

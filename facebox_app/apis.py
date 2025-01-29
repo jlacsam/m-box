@@ -13,8 +13,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers
-from .models import FbxFile, FbxFolder, FbxPerson
+from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers, update_text_embedding
+from .models import MboxFile, MboxFolder, MboxPerson
 
 
 # Create Folder ####################################################################################
@@ -38,10 +38,10 @@ def create_folder(request,parent_id):
     if not name:
         return Response({'error': 'Name is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    parent = get_object_or_404(FbxFolder, folder_id=parent_id)
+    parent = get_object_or_404(MboxFolder, folder_id=parent_id)
 
     try:
-        folder = FbxFolder(
+        folder = MboxFolder(
             name = name,
             path = parent.path_name,
             parent_id = parent_id,
@@ -75,7 +75,7 @@ def rename_folder(request,folder_id):
         return Response({'error':'Permission denied. Write and execute permissions on the folder are required.'},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
     try:
         name = request.data.get('name')
         old_path_name = folder.path_name
@@ -116,7 +116,7 @@ def rename_file(request,file_id):
         return Response({'error':'Permission denied. Write permission on the file is required.'},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
     try:
         old_name = file.name
         file.name = request.data.get('name')
@@ -141,7 +141,7 @@ def set_folder_owner(request,folder_id,owner_name):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
                         'can change the ownership of a folder.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     if folder.owner_name == owner_name:
         return Response({'error':f'Owner is already {owner_name}.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -173,7 +173,7 @@ def set_file_owner(request,file_id,owner_name):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
                         'can change the owner of a file.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
 
     if file.owner_name == owner_name:
         return Response({'error':f'Owner is already {owner_name}.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -205,7 +205,7 @@ def set_folder_group(request,folder_id,group_name):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
                         'can change the group of a folder.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     try:
         old_group_name = folder.group_name
@@ -234,7 +234,7 @@ def set_file_group(request,file_id,group_name):
         return Response({'error':'Permission denied. Only the owner and administrator ' \
                         'can change the group of a file.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
 
     if not request.user.is_superuser:
         if request.user.username.lower() != file.owner_name.lower():
@@ -275,7 +275,7 @@ def set_folder_permission(request,folder_id,owner_rights,group_rights,domain_rig
     if owner_rights > 7 or group_rights > 7 or domain_rights > 7 or public_rights > 7:
         return Response({'error':'Invalid value(s)'}, status=status.HTTP_400_BAD_REQUEST)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     old_permissions = f"{folder.owner_rights}|{folder.group_rights}|{folder.domain_rights}|{folder.public_rights}"
     new_permissions = f"{owner_rights}|{group_rights}|{domain_rights}|{public_rights}"
@@ -312,7 +312,7 @@ def set_file_permission(request,file_id,owner_rights,group_rights,domain_rights,
     if owner_rights > 7 or group_rights > 7 or domain_rights > 7 or public_rights > 7:
         return Response({'error':'Invalid value(s)'}, status=status.HTTP_400_BAD_REQUEST)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
 
     old_permissions = f"{file.owner_rights}|{file.group_rights}|{file.domain_rights}|{file.public_rights}"
     new_permissions = f"{owner_rights}|{group_rights}|{domain_rights}|{public_rights}"
@@ -378,9 +378,9 @@ def unlink_faces(request, person_id):
 @validate_subscription_headers
 def move_folder(request,folder_id,target_folder):
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
-    old_parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
-    new_parent = get_object_or_404(FbxFolder, folder_id=target_folder)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
+    old_parent = get_object_or_404(MboxFolder, folder_id=folder.parent_id)
+    new_parent = get_object_or_404(MboxFolder, folder_id=target_folder)
 
     # Check if the user has permission to remove the folder from its parent
     if not check_folder_permission(request,folder.parent_id,'delete'):
@@ -423,9 +423,9 @@ def move_folder(request,folder_id,target_folder):
 @validate_subscription_headers
 def move_file(request,file_id,target_folder):
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
-    old_folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
-    new_folder = get_object_or_404(FbxFolder, folder_id=target_folder)
+    file = get_object_or_404(MboxFile, file_id=file_id)
+    old_folder = get_object_or_404(MboxFolder, folder_id=file.folder_id)
+    new_folder = get_object_or_404(MboxFolder, folder_id=target_folder)
 
     # Check if the user has permission to remove the file from the source folder
     if not check_folder_permission(request,file_id,'delete'):
@@ -496,7 +496,7 @@ def delete_folder(request,folder_id):
     if count > 0:
         return Response({'error':'Folder is not empty.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     if folder.is_deleted:
         return Response({'error':'Folder is already deleted.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -529,7 +529,7 @@ def delete_file(request,file_id):
         return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
 
     if file.is_deleted:
         return Response({'error':'File is already deleted.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -592,7 +592,7 @@ def get_presigned_url(request, file_id, for_streaming=True):
     
     try:
         # Get file object from database
-        file = FbxFile.objects.get(file_id=file_id)
+        file = MboxFile.objects.get(file_id=file_id)
         
         # Generate presigned URL with 24-hour expiration
         target = "inline" if for_streaming else f"attachment; filename={file['name']}"
@@ -610,7 +610,7 @@ def get_presigned_url(request, file_id, for_streaming=True):
         update_last_accessed(file_id,'file')
 
         return redirect(url)
-    except FbxFile.DoesNotExist:
+    except MboxFile.DoesNotExist:
         return Response({'error': 'File not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
@@ -675,12 +675,12 @@ def restore_folder(request,folder_id):
         return Response({'error':'Permission denied. Write and execute permissions ' \
                         'on the parent folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     if not folder.is_deleted:
         return Response({'error':'Folder is not deleted.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
+    parent = get_object_or_404(MboxFolder, folder_id=folder.parent_id)
     if parent.is_deleted:
         return Response({'error':f'Cannot restore to a deleted parent folder: {parent.path_name}'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -707,12 +707,12 @@ def restore_file(request,file_id):
         return Response({'error':'Permission denied. Write permission on the parent folder is required.'},
                         status=status.HTTP_401_UNAUTHORIZED)
 
-    file = get_object_or_404(FbxFile, file_id=file_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
 
     if not file.is_deleted:
         return Response({'error':'File is not deleted.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=file.folder_id)
     if folder.is_deleted:
         return Response({'error':f'Cannot restore to a deleted parent folder: {folder.path_name}'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -781,8 +781,8 @@ def upload_file(request,folder_id):
     ip_addr = get_client_ip(request)
     file = None
     try:
-        folder = get_object_or_404(FbxFolder, folder_id=folder_id)
-        file = FbxFile(
+        folder = get_object_or_404(MboxFolder, folder_id=folder_id)
+        file = MboxFile(
             folder_id=folder_id,
             name=uploaded_file.name,
             extension=ext[1:],
@@ -818,7 +818,7 @@ def update_file(request, file_id):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     # Get file record
-    row = get_object_or_404(FbxFile, file_id=file_id)
+    row = get_object_or_404(MboxFile, file_id=file_id)
 
     try:
         data = request.data
@@ -842,7 +842,7 @@ def update_file(request, file_id):
         for field, value in data.items():
             try:
                 # Check if the field exists in the model
-                FbxFile._meta.get_field(field)
+                MboxFile._meta.get_field(field)
                 old_data[field] = getattr(row, field)
                 setattr(row, field, value)
                 new_data[field] = value
@@ -856,10 +856,16 @@ def update_file(request, file_id):
             # Insert audit record, update last_modified
             insert_audit(request.user.username,'UPDATE','mbox_file',file_id,old_data,new_data,get_client_ip(request))
             update_last_modified(file_id)
+
+            # If the description field changed, update the corresponding embedding
+            if 'description' in updated_fields:
+                update_text_embedding(file_id,'S',None,new_data['description'])
+
             return Response({
                 'message': f'Metadata updated for file {file_id}',
                 'update_fields': updated_fields
             })
+
         else:
             return Response({'message': 'No valid fields were provided for update.'}, status=400)
 
@@ -878,7 +884,7 @@ def update_folder(request,folder_id):
         return Response({'error':'Permission denied.'})
 
     # Get file record
-    row = get_object_or_404(FbxFolder, folder_id=folder_id)
+    row = get_object_or_404(MboxFolder, folder_id=folder_id)
 
     try:
         data = request.data
@@ -899,7 +905,7 @@ def update_folder(request,folder_id):
         for field, value in data.items():
             try:
                 # Check if the field exists in the model
-                FbxFolder._meta.get_field(field)
+                MboxFolder._meta.get_field(field)
                 old_data[field] = getattr(row, field)
                 setattr(row, field, value)
                 new_data[field] = value
@@ -944,7 +950,7 @@ def update_person(request, person_id):
 
     # Get file record
     try:
-        row = get_object_or_404(FbxPerson, person_id=person_id)
+        row = get_object_or_404(MboxPerson, person_id=person_id)
         data = request.data
         if not data:
             return Response({'error': 'No data provided'}, status=HTTP_400_BAD_REQUEST)
@@ -956,7 +962,7 @@ def update_person(request, person_id):
         for field, value in data.items():
             try:
                 # Check if the field exists in the model
-                FbxPerson._meta.get_field(field)
+                MboxPerson._meta.get_field(field)
                 old_data[field] = getattr(row, field)
                 setattr(row, field, value)
                 new_data[field] = value
@@ -1003,6 +1009,9 @@ def update_transcript_segment(request, file_id):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    if oldstr == newstr:
+        return Response({'error': 'Old data and new data are identical.'}, status=status.HTTP_400_BAD_REQUEST)
+
     query = """
         UPDATE mbox_file SET webvtt = REPLACE(webvtt,%s,%s)
         WHERE POSITION(%s IN webvtt) > 0 AND file_id = %s
@@ -1016,6 +1025,9 @@ def update_transcript_segment(request, file_id):
     new_data = {'webvtt-cue':newstr}
     insert_audit(request.user.username,'UPDATE','mbox_file',file_id,old_data,new_data,get_client_ip(request))
     update_last_modified(file_id)
+
+    # Update the corresponding embedding
+    update_text_embedding(file_id,'T',timeref,data['newstr'],data['oldstr'])
 
     # Return the number of rows affected
     return Response({'rowcount':count}, status=status.HTTP_200_OK)

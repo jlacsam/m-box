@@ -248,11 +248,12 @@
             const headerParamsDiv = document.getElementById('headerParams');
             headerParamsDiv.innerHTML = '<h3>Headers</h3>';
             selectedApi.headers.forEach(header => {
-                if (!commonHeaders.includes(header)) {
+                const [key, value] = Object.entries(header)[0];
+                if (!commonHeaders.includes(key)) {
                     headerParamsDiv.innerHTML += `
                         <div class="form-group">
-                            <label for="header_${header}">${header}</label>
-                            <input type="text" id="header_${header}" required>
+                            <label for="header_${header}">${key}</label>
+                            <input type="text" id="header_${key}" value="${value}"required>
                         </div>
                     `;
                 }
@@ -336,9 +337,14 @@
             });
 
             // Add custom headers
+            let contentType = 'text/plain';
             selectedApi.headers.forEach(header => {
-                if (!commonHeaders.includes(header)) {
-                    headers[header] = document.getElementById(`header_${header}`).value;
+                const [key, value] = Object.entries(header)[0];
+                if (key.toLowerCase() === 'content-type') {
+                    contentType = value.toLowerCase();
+                }
+                if (!commonHeaders.includes(key)) {
+                    headers[key] = document.getElementById(`header_${key}`).value;
                 }
             });
 
@@ -351,8 +357,6 @@
 
             // Handle different content types
             if (selectedApi.body) {
-                const contentType = selectedApi.body.content_type || 'application/json';
-                
                 if (contentType === 'multipart/form-data') {
                     const formData = new FormData();
                     const fileInput = document.getElementById('fileInput');
@@ -368,9 +372,8 @@
                             `<h3>Error:</h3><pre>Please select a file to upload</pre>`;
                         return;
                     }
-                } else {
+                } else if (contentType === 'application/json') {
                     // Handle JSON body
-                    headers['Content-Type'] = 'application/json';
                     try {
                         const bodyContent = document.getElementById('requestBody').value;
                         fetchOptions.body = bodyContent.trim();
@@ -378,6 +381,16 @@
                         document.getElementById('response').style.display = 'block';
                         document.getElementById('response').innerHTML = 
                             `<h3>Error:</h3><pre>Invalid JSON in request body: ${error.message}</pre>`;
+                        return;
+                    }
+                } else if (contentType === 'text/plain') {
+                    try {
+                        const bodyContent = document.getElementById('requestBody').value;
+                        fetchOptions.body = bodyContent.trim();
+                    } catch (error) {
+                        document.getElementById('response').style.display = 'block';
+                        document.getElementById('response').innerHTML = 
+                            `<h3>Error:</h3><pre>${error.message}</pre>`;
                         return;
                     }
                 }
@@ -392,7 +405,7 @@
                 headers: headers
             };
 
-            if (selectedApi.body && selectedApi.body.content_type === 'multipart/form-data') {
+            if (selectedApi.body && contentType === 'multipart/form-data') {
                 const fileInput = document.getElementById('fileInput');
                 if (fileInput.files.length > 0) {
                     const file = fileInput.files[0];
@@ -402,8 +415,10 @@
                         type: file.type
                     };
                 }
-            } else if (selectedApi.body) {
+            } else if (selectedApi.body && contentType === 'application/json') {
                 requestDetails.body = JSON.parse(document.getElementById('requestBody').value);
+            } else if (selectedApi.body && contentType === 'text/plain') {
+                requestDetails.body = document.getElementById('requestBody').value;
             }
 
             document.getElementById('request').style.display = 'block';

@@ -317,6 +317,14 @@ a:visited {
   text-align: center;
 }
 
+.semantic-search {
+  background-color: cyan;
+}
+
+.invalid-search {
+  background-color: red;
+}
+
 .filter-hidden {
   position: fixed;
   top: 0px;
@@ -605,7 +613,7 @@ ul li:hover {
 }
 
 #search-box {
-  width: 512px;
+  width: 640px;
   height: 32px;
   border-radius: 8px;
   padding: 5px 10px;
@@ -630,6 +638,7 @@ ul li:hover {
 #results-table td {
   padding: 8px;
   text-align: left;
+  vertical-align: top;
   border: 1px solid #444;
 }
 

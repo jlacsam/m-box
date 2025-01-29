@@ -402,7 +402,14 @@ function getGroups() {
       "X-CSRFToken": csrftoken,
     },
   })
-    .then((response) => response.json())
+    .then((response) => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then((data) => {
       displayGroups(data.groups);
       if (data.groups.includes("Editors")) {
@@ -428,7 +435,11 @@ function unLinkFaces(person_id, unlinkPerson) {
   })
     .then((response) => response.json())
     .then((data) => {
-      console.log(data)
+      if (data.error) {
+          alert(data.error);
+          return;
+      }
+
       const searchButton = document.getElementById("search-button");
       const linkFacesButton = document.getElementById("link-faces-button");
       const unlinkFacesButton = document.getElementById("unlink-faces-button");
@@ -989,7 +1000,9 @@ function displayThumbnails(data) {
     })
       .then((response) => {
         if (!response.ok) {
-          throw new Error("Network response was not ok");
+          return response.json().then(data => {
+            throw new Error(data.error || 'Unknown error occurred.');
+          });
         }
         return response.blob(); // Get the image data as a blob
       })
@@ -1002,7 +1015,7 @@ function displayThumbnails(data) {
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
         document.getElementById("imageDisplay").innerHTML =
-          "<p>Error loading image</p>";
+          `<p>Error loading image:${error.message}</p>`;
       });
   });
 }
@@ -1221,15 +1234,19 @@ function saveEdits() {
   })
     .then((response) => response.json())
     .then((data) => {
-      editorDiv.classList.remove("editor-visible");
-      editorDiv.classList.add("editor-hidden");
-      const editable = document.getElementById(
-        editorDiv.getAttribute("original-id")
-      );
-      editable.innerHTML = sanitizeHtml(full_name);
-      editable.dataset.first_name = first_name;
-      editable.dataset.middle_name = middle_name;
-      editable.dataset.last_name = last_name;
+      if (data.error) {
+        alert(data.error);
+      } else {
+        editorDiv.classList.remove("editor-visible");
+        editorDiv.classList.add("editor-hidden");
+        const editable = document.getElementById(
+          editorDiv.getAttribute("original-id")
+        );
+        editable.innerHTML = sanitizeHtml(full_name);
+        editable.dataset.first_name = first_name;
+        editable.dataset.middle_name = middle_name;
+        editable.dataset.last_name = last_name;
+      }
     })
     .catch((error) => {
       alert("Unable to save data.");
@@ -1280,7 +1297,7 @@ function getAudit(file_id) {
     .then((response) => response.json())
     .then((data) => {
       if (data.error) {
-        console.log(data.error);
+        alert(data.error);
       } else {
         displayAudit(data.results);
       }

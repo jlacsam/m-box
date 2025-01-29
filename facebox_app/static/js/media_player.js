@@ -147,7 +147,14 @@ function getGroups() {
             'X-CSRFToken': csrftoken,
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         displayGroups(data.groups);
         if (data.groups.includes('Editors')) {
@@ -263,7 +270,14 @@ function updateFile() {
         },
         body: JSON.stringify(pair)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         editorDiv.classList.remove('editor-visible');
         editorDiv.classList.add('editor-hidden');
@@ -271,7 +285,7 @@ function updateFile() {
         editable.innerHTML = sanitizeHtml(value);
     })
     .catch(error => {
-        alert('Unable to save data. Error:', error);
+        alert(error.message);
     });
 }
 
@@ -355,7 +369,14 @@ function updateTranscript() {
         },
         body: JSON.stringify(triple)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data['rowcount'] > 0) {
             editorDiv.classList.remove('editor-visible');
@@ -367,7 +388,7 @@ function updateTranscript() {
         }
     })
     .catch(error => {
-        alert('Unable to save data. Error:', error);
+        alert(error.message);
     });
 }
 
@@ -502,7 +523,14 @@ function getFileCount(folder_id) {
             'X-CSRFToken': csrftoken,
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         totalFiles = data.result;
         document.getElementById('detail-file-count').innerHTML = data.result + ' files)';
@@ -523,7 +551,14 @@ function getFilePosition(file_id,folder_id) {
             'X-CSRFToken': csrftoken,
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         document.getElementById('detail-file-position').innerHTML = '(' + data.result + ' of ';
     })
@@ -592,7 +627,14 @@ function showTranscript(file_id) {
             'X-CSRFToken': csrftoken,
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         let webvtt = data.transcript[0].webvtt;
 /*
@@ -716,8 +758,7 @@ function getAudit(file_id) {
         }
     })
     .catch(error => {
-        console.log(error)
-        alert('Unable to save data. Error:', error);
+        alert(error.message);
     });
 }
 
@@ -780,7 +821,7 @@ function highlightJsonChanges(oldData, newData) {
         return result;
     }
 
-    if (newObj == null)
+    if (newObj == null || oldObj == null)
         return "";
 
     const result = {};
@@ -813,7 +854,14 @@ function browseFolder(parent_id = 1) {
                 'X-CSRFToken': csrftoken,
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Unknown error occurred.');
+                });
+            }
+            return response.json();
+        })
     }
 
     function createFolderElement(tree,folder) {
@@ -902,8 +950,7 @@ function browseFolder(parent_id = 1) {
         folderBrowser.style.left = rect.x + 'px';           
     })
     .catch(error => {
-        console.log(error);
-        alert('An error occurred while fetching folders.');
+        alert(error);
     });
 }
 

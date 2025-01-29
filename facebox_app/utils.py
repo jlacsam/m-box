@@ -1,22 +1,32 @@
+import os
 import numpy as np
 import librosa
 import io
 import configparser
+
+from functools import wraps
 from keras_facenet import FaceNet
 from mtcnn import MTCNN
 from PIL import Image
 from pydub import AudioSegment
-from .models import FbxFile, FbxFolder, FbxAudit
+from .models import MboxFile, MboxFolder, MboxAudit
+
+from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from functools import wraps
+
 from rest_framework.response import Response
 from rest_framework import status
 
+# Libraries needed for text embedding
+import tensorflow as tf
+import tensorflow_hub as hub
+import tensorflow_text
 
-# Initialize FaceNet model and MTCNN detector
+# Initialize the FaceNet model and the MTCNN detector
 facenet = FaceNet()
 detector = MTCNN()
+USE_CMLM = hub.load(os.environ.get('USE_CMLM_HOME'))
 
 def preprocess_image(image):
     """
@@ -78,6 +88,9 @@ def get_voice_embedding(audio_segment):
 
     return mfcc_embedding_normalized.tolist()
 
+def get_text_embedding(text):
+    return USE_CMLM([text]).numpy()[0]
+
 def validate_subscription(subscription_id, client_secret):
     """
     Validates the subscription ID and client secret
@@ -128,7 +141,7 @@ def get_client_ip(request):
 
 # Check Folder Permissions #####################################################
 def check_folder_permission(request,folder_id,action):
-    folder = get_object_or_404(FbxFolder, folder_id=folder_id)
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
     user = request.user
     groups = request.user.groups.all()
 
@@ -172,7 +185,7 @@ def check_folder_permission(request,folder_id,action):
                 return True
 
     if action in [ 'delete', 'restore' ]: # Delete or restore the folder
-        parent = get_object_or_404(FbxFolder, folder_id=folder.parent_id)
+        parent = get_object_or_404(MboxFolder, folder_id=folder.parent_id)
         if parent.public_rights & 2 and parent.public_rights & 1 and \
             folder.public_rights & 2 and folder.public_rights & 1: # -wx
             return True
@@ -206,8 +219,8 @@ def check_folder_permission(request,folder_id,action):
 
 # Check File Permissions #####################################################
 def check_file_permission(request,file_id,action):
-    file = get_object_or_404(FbxFile, file_id=file_id)
-    folder = get_object_or_404(FbxFolder, folder_id=file.folder_id)
+    file = get_object_or_404(MboxFile, file_id=file_id)
+    folder = get_object_or_404(MboxFolder, folder_id=file.folder_id)
     user = request.user
     groups = request.user.groups.all()
 
@@ -304,7 +317,7 @@ def check_file_permission(request,file_id,action):
 # Insert audit record ##############################################################################
 def insert_audit(username,activity,table_name,record_id,old_data,new_data,location):
     try:
-        audit = FbxAudit(
+        audit = MboxAudit(
             username = username,
             activity = activity,
             table_name = table_name,
@@ -323,9 +336,9 @@ def insert_audit(username,activity,table_name,record_id,old_data,new_data,locati
 def update_last_accessed(record_id,target='file'):
     try:
         if target == 'folder':
-            row = get_object_or_404(FbxFolder, folder_id=record_id)
+            row = get_object_or_404(MboxFolder, folder_id=record_id)
         else:
-            row = get_object_or_404(FbxFile, file_id=record_id)
+            row = get_object_or_404(MboxFile, file_id=record_id)
         row.last_accessed = timezone.now()
         row.save()
     except Exception as e:
@@ -336,9 +349,9 @@ def update_last_accessed(record_id,target='file'):
 def update_last_modified(record_id,target='file'):
     try:
         if target == 'folder':
-            row = get_object_or_404(FbxFolder, folder_id=record_id)
+            row = get_object_or_404(MboxFolder, folder_id=record_id)
         else:
-            row = get_object_or_404(FbxFile, file_id=record_id)
+            row = get_object_or_404(MboxFile, file_id=record_id)
         row.last_modified = timezone.now()
         row.save()
     except Exception as e:
@@ -397,3 +410,62 @@ def override_file_url(records, labels):
     except ValueError:
         print("WARNING: Unable to replace AWS S3/Azure Blob Storage URLs with m-box URLs.")
         return records
+
+
+# Update text embedding ############################################################################
+def update_text_embedding(file_id, source, time_range, new_text, old_text=None):
+    if source == 'S': # Synopsis
+        embedding = get_text_embedding(new_text)
+        query = """
+                UPDATE mbox_transcript SET chunk = %s, embedding = %s::vector
+                WHERE file_id = %s AND source = %s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, (new_text.strip(), embedding.tolist(), file_id, source))
+            return cursor.rowcount
+
+    elif source == 'T': # Transcript
+        time_start_str, time_end_str = map(str.strip, time_range.split('-->'))
+
+        def time_to_seconds(time_str):
+            hours, minutes, seconds = map(float, time_str.split(':'))
+            return hours * 3600 + minutes * 60 + seconds
+
+        # Add some fudge to account for floating point variations when moving data around
+        time_start = time_to_seconds(time_start_str) + (1.0/60.0) 
+        time_end = time_to_seconds(time_end_str) - (1.0/60.0)
+
+        # Get the old chunk
+        query = """
+                SELECT chunk_id, chunk, source, time_start, time_end
+                FROM mbox_transcript 
+                WHERE file_id = %s
+                      AND source = 'T'
+                      AND time_start <= %s
+                      AND time_end >= %s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, (file_id, time_start, time_end))
+            chunk = cursor.fetchone()
+            if chunk is None:
+                print(f"Unable to find a chunk in file {file_id} that encloses {time_start} and {time_end}.")
+                return 0
+
+        chunk_id = chunk[0]
+        old_chunk = chunk[1]
+
+        # Check if the old text is within the chunk
+        if old_chunk.find(old_text) < 0:
+            return 0
+
+        new_chunk = old_chunk.replace(old_text, new_text)
+        embedding = get_text_embedding(new_chunk)
+
+        query = """
+                UPDATE mbox_transcript SET chunk = %s, embedding = %s::vector
+                WHERE chunk_id = %s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, (new_chunk, embedding.tolist(), chunk_id))
+            return cursor.rowcount
+

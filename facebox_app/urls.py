@@ -31,6 +31,7 @@ urlpatterns = [
     path('get-media/<int:file_id>/', views.get_media, name='get_media'),
     path('get-adjacent-media/<int:file_id>/', views.get_adjacent_media, name='get_adjacent_media'),
     path('get-thumbnail/<int:file_id>/', views.get_thumbnail, name='get_thumbnail'),
+    path('get-chunk-thumbnail/<int:chunk_id>/', views.get_chunk_thumbnail, name='get_chunk_thumbnail'),
     path('get-linked-faces/<int:person_id>/', views.get_linked_faces, name='get_linked_faces'),
     path('search-audit/', views.search_audit, name='search_audit'),
     path('search-face/', views.search_face, name='search_face'),
@@ -41,6 +42,7 @@ urlpatterns = [
     path('search-audio/', views.search_media, name='search_audio'),
     path('search-photo/', views.search_media, name='search_photo'),
     path('search-person/', views.search_person, name='search_person'),
+    path('search-transcript/', views.search_transcript, name='search_transcript'),
     path('stream-audio/<int:file_id>/', views.stream_audio, name='stream_audio'),
     # APIs that get information about the data, create data or modify the data
     path('create-folder/<int:parent_id>/', apis.create_folder, name='create_folder'),

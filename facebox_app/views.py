@@ -20,8 +20,8 @@ from django.contrib.auth.decorators import login_required
 
 from azure.storage.blob import BlobServiceClient
 
-from .utils import get_face_embedding, get_voice_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
-from .models import FbxFace, FbxFile, FbxThumbnail, FbxFolder
+from .utils import get_face_embedding, get_voice_embedding, get_text_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
+from .models import MboxFace, MboxFile, MboxThumbnail, MboxFolder, MboxTranscript
 
 
 # Search the mbox_face table ########################################################################
@@ -341,8 +341,8 @@ def get_face_image(request, face_id):
 
     try:
         # Query the database
-        face = FbxFace.objects.get(face_id=face_id)
-        thumbnails = FbxThumbnail.objects.get(thumbnail_id=face.thumbnail_id)
+        face = MboxFace.objects.get(face_id=face_id)
+        thumbnails = MboxThumbnail.objects.get(thumbnail_id=face.thumbnail_id)
         file_path = thumbnails.path
 
         if os.path.exists(thumbnails.path):
@@ -369,9 +369,9 @@ def get_face_image(request, face_id):
             response['Content-Disposition'] = f'inline; filename="face_{face_id}.jpg"'
             return response
 
-    except FbxFile.DoesNotExist:
+    except MboxFile.DoesNotExist:
         return Response({'error': 'File not found.'}, status=404)
-    except FbxThumbnail.DoesNotExist:
+    except MboxThumbnail.DoesNotExist:
         return Response({'error': 'Thumbnail not found.'}, status=404)
     except IOError:
         return Response({'error': 'Error reading thumbnail file.'}, status=500)
@@ -389,8 +389,8 @@ def get_thumbnail(request, file_id):
 
     try:
         #Query the database
-        file = FbxFile.objects.get(file_id=file_id)
-        thumbnails = FbxThumbnail.objects.get(thumbnail_id=file.thumbnail_id)
+        file = MboxFile.objects.get(file_id=file_id)
+        thumbnails = MboxThumbnail.objects.get(thumbnail_id=file.thumbnail_id)
         file_path = thumbnails.path
 
         if os.path.exists(thumbnails.path):
@@ -422,9 +422,60 @@ def get_thumbnail(request, file_id):
             response['Content-Disposition'] = f'inline; filename="{file.name}_thumbnail.jpg"'
             return response
 
-    except FbxFile.DoesNotExist:
+    except MboxFile.DoesNotExist:
         return Response({'error': 'File not found.'}, status=404)
-    except FbxThumbnail.DoesNotExist:
+    except MboxThumbnail.DoesNotExist:
+        return Response({'error': 'Thumbnail not found.'}, status=404)
+    except IOError:
+        return Response({'error': 'Error reading thumbnail file.'}, status=500)
+    except struct.error:
+        return Response({'error': 'Error parsing thumbnail size.'}, status=500)
+
+
+# Get a jpeg thumbnail for a transcript chunk ######################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_chunk_thumbnail(request, chunk_id):
+
+    try:
+        #Query the database
+        chunk = MboxTranscript.objects.get(chunk_id=chunk_id)
+        thumbnails = MboxThumbnail.objects.get(thumbnail_id=chunk.thumbnail_id)
+        file_path = thumbnails.path
+
+        if os.path.exists(thumbnails.path):
+            file_path = thumbnails.path
+        else:
+            file_path = os.path.join(settings.MEDIA_ROOT,thumbnails.path)
+
+        if not os.path.exists(file_path):
+            print(f"{thumbnails.path} not found.")
+            print(f"{file_path} not found.")
+ 
+        with open(file_path, 'rb') as f:
+            f.seek(chunk.thumbnail_offset)
+            temp = f.read(4)
+            thumbnail_size = struct.unpack('<I', temp)[0]
+            #print(f"Reading {thumbnail_size} bytes from {thumbnails.path} starting {file.thumbnail_offset+4} for file_id={file_id}, name={file.name}")
+            f.seek(chunk.thumbnail_offset + 4)  # Skip the size bytes
+            jpeg_thumbnail = f.read(thumbnail_size)
+            
+            # Validate JPEG data
+            if jpeg_thumbnail[:2] != b'\xFF\xD8' or jpeg_thumbnail[-2:] != b'\xFF\xD9':
+                return Response({'error': 'Invalid JPEG data'}, status=400)
+            
+            # Create a file-like object from the bytes
+            jpeg_io = io.BytesIO(jpeg_thumbnail)
+            
+            # Use HttpResponse instead of FileResponse
+            response = HttpResponse(jpeg_io, content_type='image/jpeg')
+            response['Content-Disposition'] = f'inline; filename="{chunk_id}_thumbnail.jpg"'
+            return response
+
+    except MboxFile.DoesNotExist:
+        return Response({'error': 'File not found.'}, status=404)
+    except MboxThumbnail.DoesNotExist:
         return Response({'error': 'Thumbnail not found.'}, status=404)
     except IOError:
         return Response({'error': 'Error reading thumbnail file.'}, status=500)
@@ -890,7 +941,10 @@ def search_person(request):
                 fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
                 MIN(ff.time_start), MAX(ff.time_end), fp.face_id, fl.file_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
-            WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND fp.person_id > %s 
+            WHERE fp.person_id = ff.person_id 
+                AND ff.file_id = fl.file_id 
+                AND fp.person_id > %s 
+                AND ff.merged_to IS NULL
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
@@ -909,7 +963,11 @@ def search_person(request):
                 fp.confidence, MIN(ff.face_id), fl.name AS file_name, fl.file_url, 
                 MIN(ff.time_start), MAX(ff.time_end), fp.face_id, fl.file_id
             FROM mbox_person fp, mbox_face ff, mbox_file fl
-            WHERE fp.person_id = ff.person_id AND ff.file_id = fl.file_id AND ff.file_id IN (%s) AND fp.person_id > %s 
+            WHERE fp.person_id = ff.person_id
+                AND ff.file_id = fl.file_id
+                AND ff.file_id IN (%s)
+                AND fp.person_id > %s 
+                AND ff.merged_to IS NULL
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
@@ -1246,8 +1304,8 @@ def stream_audio(request, file_id):
     time_offset = float(request.headers.get('Time-Offset'))
 
     # Query the database, get the file record
-    file = FbxFile.objects.get(file_id=file_id)
-    folder = FbxFolder.objects.get(folder_id=file.folder_id)
+    file = MboxFile.objects.get(file_id=file_id)
+    folder = MboxFolder.objects.get(folder_id=file.folder_id)
 
     # Get the blob file from Azure
     blob_service_client = BlobServiceClient.from_connection_string(settings.AZURE_CONNECTION_STRING)
@@ -1290,3 +1348,93 @@ def stream_audio(request, file_id):
     response['Content-Length'] = str(total_length - byte_offset)
     
     return response
+
+# Search the mbox_transcript table for semantically matching records ###############################
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def search_transcript(request):
+    max_rows = request.headers.get('Max-Rows')
+    start_from = request.headers.get('Start-From')
+    scope = request.headers.get('Scope')
+    media_type = request.headers.get('Media-Type')
+    text = request.data.get('text')
+
+    if len(text) == 0:
+        return Response({'error':'Missing text input'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        embedding = get_text_embedding(text)
+    except Exception as e:
+        return Response({'error':f'{e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    offset = 0
+    if start_from is not None:
+        offset = start_from
+
+    # Append a wild card for the LIKE operator
+    if scope[-1] != '/':
+        scope += '/%'
+    else:
+        scope += '%'
+
+    # Default media type is video
+    if media_type is None:
+        media_types = ('video',)
+        placeholders = '%s'
+    else:
+        media_types = tuple(media_type.split(','))
+        placeholders = ','.join(['%s'] * len(media_types))
+
+    # Search for matching records in the database
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url', 
+        'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
+        'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 
+        'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'cosine_distance',
+        'chunk_id', 'chunk_start', 'chunk_end', 'chunk_source'];
+
+    query = """
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+            fl.archive_url, fl.date_created, fl.date_uploaded, mt.chunk, fl.tags, fl.people, fl.places, 
+            fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, 
+            fl.version, fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights,
+            (embedding <=> %s::vector) AS cosine_distance,
+            mt.chunk_id, mt.time_start, mt.time_end, mt.source
+        FROM mbox_transcript mt, mbox_file fl, mbox_folder fd
+        WHERE mt.file_id = fl.file_id
+            AND embedding <=> %s::vector < 1.0
+            AND fl.folder_id = fd.folder_id 
+            AND fd.path_name LIKE %s
+            AND fl.media_type IN ({}) 
+            AND NOT fl.is_deleted 
+        ORDER BY cosine_distance ASC
+        LIMIT %s
+        OFFSET %s
+        """.format(placeholders)
+
+    rows = []
+    with connection.cursor() as cursor:
+        params = (embedding.tolist(), embedding.tolist(), scope) + media_types + (max_rows, offset)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Insert an audit record for this action
+    params = (text,scope) + media_types + (max_rows,offset)
+    insert_audit(request.user.username,'SEARCH TRANSCRIPT','mbox_transcript',
+                 0,None,str(params),get_client_ip(request))
+
+    # Serialize the results and return the response
+    if len(rows):
+        rows = override_file_url(rows, labels)
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+

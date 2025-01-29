@@ -37,6 +37,19 @@ document.addEventListener("DOMContentLoaded", function () {
   searchBox.addEventListener("keyup", function (event) {
     if (event.key === "Enter") {
       performSearch();
+    } else if (searchBox.value.length > 1) {
+      if (isSemantic(searchBox.value) > 0) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.add('semantic-search');
+      } else if (isProperlyQuotedOrUnquoted(searchBox.value)) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.remove('semantic-search');
+      } else {
+        searchBox.classList.add('invalid-search');
+      }
+    } else {
+      searchBox.classList.remove('invalid-search');
+      searchBox.classList.remove('semantic-search');
     }
   });
 
@@ -90,6 +103,13 @@ document.addEventListener("DOMContentLoaded", function () {
       folderBrowser.classList.add("folder-browser-hidden");
     }
   });
+
+  // Get initial folder
+  savedFolder = getCookie('currentFolder');
+  if (savedFolder != null) currentFolder = savedFolder;
+  const breadCrumbs = document.getElementById("bread-crumbs");
+  breadCrumbs.innerHTML = currentFolder == '/' ? '[all folders]' : currentFolder;
+  updatePlaceholder();
 
   videosTab.style.color = "#ffffff";
 
@@ -148,15 +168,21 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
     */
   const searchBox = document.getElementById("search-box");
   let value = searchBox.value.trim();
+
   currentPage = 1;
-  if (value.length == 0 || isValidTsQueryString(value)) {
-    searchVideos(value, currentFolder);
-  } else if (isUnquoted(value) && containsSpace(value)) {
-    // make the search string a valid TsQuery. Assume OR.
-    value = trimWhitespaces(value).replaceAll(" ", " | ");
-    searchVideos(value, currentFolder);
+
+  if (isSemantic(value) > 0) {
+    doSemanticSearch(value, currentFolder);
   } else {
-    alert("Invalid search string.");
+    if (value.length == 0 || isValidTsQueryString(value)) {
+      searchVideos(value, currentFolder);
+    } else if (isUnquoted(value) && containsSpace(value)) {
+      // make the search string a valid TsQuery. Assume OR.
+      value = trimWhitespaces(value).replaceAll(" ", " | ");
+      searchVideos(value, currentFolder);
+    } else {
+      alert("Invalid search string.");
+    }
   }
 }
 
@@ -333,6 +359,7 @@ function searchVideos(pattern = "", scope = "/") {
       if (data.error) {
         displayError(data.error);
       } else {
+        document.getElementById("desc-header").innerHTML = "Description";
         recordSet = data.results;
         displayResults(data.results);
         highlightWords(dequote(pattern));
@@ -352,6 +379,56 @@ function searchVideos(pattern = "", scope = "/") {
       displayError("An error occurred while fetching data.");
     });
 }
+
+function doSemanticSearch(text, scope = "/") {
+  const csrftoken = getCookie("csrftoken");
+  const offset = (currentPage - 1) * maxRows;
+
+  table = $("#results-table").DataTable();
+  table.destroy();
+
+  let pair = {};
+  pair['text'] = text;
+
+  fetch("/api/search-transcript/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrftoken,
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "Media-Type": "video",
+      "Scope": scope,
+      "Max-Rows": maxRows,
+      "Start-From": offset,
+    },
+    body: JSON.stringify(pair)
+  })
+  .then((response) => response.json())
+  .then((data) => {
+    if (data.error) {
+      displayError(data.error);
+    } else {
+      document.getElementById("desc-header").innerHTML = "Excerpt";
+      recordSet = data.results;
+      displayResults(data.results);
+      updatePagination(data.results);
+      displayThumbnails(data.results,true);
+      if (data.results.length == 0) {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = "No Records Found";
+      } else {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = `Showing ${offset + 1} to ${offset + recordSet.length} Records`;
+      }
+    }
+  })
+  .catch((error) => {
+    console.log(error);
+    displayError("An error occurred while fetching data.");
+  });
+}
+
 // =======
 function openVideoPopup(videoUrl, startTime) {
   const popup = document.createElement("div");
@@ -373,6 +450,7 @@ function closeVideoPopup() {
     popup.remove();
   }
 }
+
 function displayResultsTiles(data, append = false) {
   const resultsBodyTiles = document.getElementById("tiles-results");
   if (!resultsBodyTiles) {
@@ -388,6 +466,8 @@ function displayResultsTiles(data, append = false) {
   }
 
   let html = "";
+  let desc_header = document.getElementById('desc-header').innerHTML;
+  let isExcerpt = desc_header.includes('Excerpt');
 
   data.forEach((item) => {
     attributes = JSON.parse(item.attributes);
@@ -407,9 +487,10 @@ function displayResultsTiles(data, append = false) {
                 <tr>
                   <td>
                     <img class="thumbnail" id="thumbnail_tiles${
-                      item.file_id
+                      isExcerpt ? item.chunk_id : item.file_id
                     }" src="" alt="thumbnail"    
-                     data-video-url="${item.file_url}" >
+                     data-video-url="${item.file_url}" 
+                     data-start-time="${isExcerpt ? item.chunk_start : 0}" >
                   </td>
                 </tr>
                 <tr>
@@ -449,7 +530,7 @@ function displayResultsTiles(data, append = false) {
                 </tr>
                 <tr>
                   <td>
-                    <div class="field_label">Description</div>
+                    <div class="field_label">${desc_header}</div>
                     <div class="field_value">${item.description}</div>
                   </td>
                 </tr>
@@ -503,7 +584,7 @@ function displayResultsTiles(data, append = false) {
       }
     });
   });
-  displayThumbnailsTiles(data);
+  displayThumbnailsTiles(data, isExcerpt);
 }
 
 // =======below function used to display table Videos table========
@@ -512,6 +593,8 @@ function displayResults(results) {
   table.destroy();
   applyFilters();
   const resultsBody = document.getElementById("results-body");
+  const isExcerpt = document.getElementById('desc-header').innerHTML.includes('Excerpt');
+
   resultsBody.innerHTML = "";
   // console.log("DisplayResult====>", results);
   displayResultsTiles(results);
@@ -538,7 +621,7 @@ function displayResults(results) {
     });
 
     // Initialize some nullable data
-    attributes = "";
+    let attributes = "";
     if (item.attributes != null) {
       // attributes = JSON.stringify(item.attributes).replaceAll("\\","").replaceAll('"','');
       attributes = JSON.parse(item.attributes);
@@ -550,40 +633,54 @@ function displayResults(results) {
         .replaceAll('"', "")
         .replaceAll(",", ", ");
     }
-    extra_data = "";
+
+    let extra_data = "";
     if (item.extra_data != null) {
       extra_data = JSON.stringify(item.extra_data)
         .replaceAll("\\", "")
         .replaceAll('"', "");
     }
-    people = "";
+
+    let people = "";
     if (item.people != null) {
       people = item.people
         .replaceAll(",", ", ")
         .replaceAll("{", "")
         .replaceAll("}", "");
     }
-    places = "";
+
+    let places = "";
     if (item.places != null) {
       places = item.places
         .replaceAll(",", ", ")
         .replaceAll("{", "")
         .replaceAll("}", "");
     }
-    tags = "";
+
+    let tags = "";
     if (item.tags != null) {
       tags = customTrim(item.tags, "[]");
     }
-    texts = "";
+
+    let texts = "";
     if (item.texts != null) {
       texts = customTrim(item.texts, "[]");
+    }
+
+    let description = null;
+    if (isExcerpt) {
+      description = "[" + timeToStr(item.chunk_start) + " - " + timeToStr(item.chunk_end) + "] ";
+      description += item.description;
+    } else {
+      description = item.description;
     }
 
     let html = `
             <td>${item.file_id}</td>
             <td><img class="thumbnail thumbnail_tab" id="thumbnail_${
-              item.file_id
-            }" src=""  data-video-url="${item.file_url}" alt="thumbnail"></td>
+              isExcerpt ? item.chunk_id : item.file_id
+            }" src=""  data-video-url="${item.file_url}"
+              data-start-time="${isExcerpt ? item.chunk_start : 0}" alt="thumbnail"></td>
             <td>${item.title ? item.title : "None"}</td>
             <td><a href="${item.file_url}" class="hyperlink" target="_blank">${
       item.file_name
@@ -599,9 +696,9 @@ function displayResults(results) {
             <td>${formatSize(item.size)}</td>
             <td>${formatDate(item.date_created)}</td>
             <td>${formatDate(item.date_uploaded)}</td>`;
-    if (item.description == null)
+    if (description == null)
       html += `<td class='field-description'>&nbsp;</td>`;
-    else html += `<td class='field-description'>${item.description}</td>`;
+    else html += `<td class='field-description'>${description}</td>`;
     html += `
             <td>${tags}</td>
             <td>${people}</td>
@@ -659,10 +756,17 @@ document.getElementById("toggleViewBtn").addEventListener("click", function () {
     // displayTileView(); // Function to populate tiles
   }
 });
-function displayThumbnailsTiles(results) {
+
+function displayThumbnailsTiles(results, forExcerpt=false) {
   const csrftoken = getCookie("csrftoken");
   results.forEach((item) => {
-    fetch(`/api/get-thumbnail/${item.file_id}/`, {
+    let endpoint;
+    if (forExcerpt) {
+      endpoint = `/api/get-chunk-thumbnail/${item.chunk_id}/`;
+    } else {
+      endpoint = `/api/get-thumbnail/${item.file_id}/`;
+    }
+    fetch(endpoint, {
       method: "GET",
       headers: {
         "Subscription-ID": SUBSCRIPTION_ID,
@@ -682,7 +786,7 @@ function displayThumbnailsTiles(results) {
             // Create a URL for the blob and display it as an image
             const imageUrl = URL.createObjectURL(blob);
             const imageObj = document.getElementById(
-              "thumbnail_tiles" + item.file_id
+              "thumbnail_tiles" + (forExcerpt ? item.chunk_id : item.file_id)
             );
             imageObj.src = imageUrl;
           } else {
@@ -697,10 +801,17 @@ function displayThumbnailsTiles(results) {
       });
   });
 }
-function displayThumbnails(results) {
+
+function displayThumbnails(results, forExcerpt=false) {
   const csrftoken = getCookie("csrftoken");
   results.forEach((item) => {
-    fetch(`/api/get-thumbnail/${item.file_id}/`, {
+    let endpoint;
+    if (forExcerpt) {
+      endpoint = `/api/get-chunk-thumbnail/${item.chunk_id}/`;
+    } else {
+      endpoint = `/api/get-thumbnail/${item.file_id}/`;
+    }
+    fetch(endpoint, {
       method: "GET",
       headers: {
         "Subscription-ID": SUBSCRIPTION_ID,
@@ -720,7 +831,7 @@ function displayThumbnails(results) {
             // Create a URL for the blob and display it as an image
             const imageUrl = URL.createObjectURL(blob);
             const imageObj = document.getElementById(
-              "thumbnail_" + item.file_id
+              "thumbnail_" + (forExcerpt ? item.chunk_id : item.file_id)
             );
             imageObj.src = imageUrl;
           } else {
@@ -949,6 +1060,7 @@ function selectFolder(folder) {
   updatePlaceholder();
   performSearch();
   applyFilters();
+  setCookie('currentFolder',currentFolder,7*24*60*60);
 }
 
 function setMaxRows(value) {

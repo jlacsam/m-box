@@ -4,8 +4,6 @@ astunparse==1.6.3
 audioread==3.0.1
 azure-core==1.30.2
 azure-storage-blob==12.22.0
-boto3==1.35.99
-botocore==1.35.99
 certifi==2024.8.30
 cffi==1.17.1
 charset-normalizer==3.3.2
@@ -22,7 +20,6 @@ gunicorn==23.0.0
 h5py==3.11.0
 idna==3.8
 isodate==0.6.1
-jmespath==1.0.1
 joblib==1.4.2
 keras==3.5.0
 keras-facenet==0.3.2
@@ -54,10 +51,8 @@ pycparser==2.22
 pydub==0.25.1
 Pygments==2.18.0
 PyJWT==2.9.0
-python-dateutil==2.9.0.post0
 requests==2.32.3
 rich==13.8.0
-s3transfer==0.10.4
 scikit-learn==1.5.1
 scipy==1.14.1
 six==1.16.0

@@ -7,8 +7,9 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.utils import timezone
+from pgvector.django import VectorField
 
-class FbxAudit(models.Model):
+class MboxAudit(models.Model):
     audit_id = models.BigAutoField(primary_key=True)
     activity = models.CharField(max_length=64)
     event_timestamp = models.DateTimeField(default=timezone.now)
@@ -25,10 +26,10 @@ class FbxAudit(models.Model):
         db_table = 'mbox_audit'
 
 
-class FbxFace(models.Model):
+class MboxFace(models.Model):
     face_id = models.BigAutoField(primary_key=True)
-    file = models.ForeignKey('FbxFile', models.DO_NOTHING)
-    person = models.ForeignKey('FbxPerson', models.DO_NOTHING, blank=True, null=True)
+    file = models.ForeignKey('MboxFile', models.DO_NOTHING)
+    person = models.ForeignKey('MboxPerson', models.DO_NOTHING, blank=True, null=True)
     similarity = models.FloatField(blank=True, null=True)
     time_start = models.FloatField()
     time_end = models.FloatField()
@@ -38,7 +39,7 @@ class FbxFace(models.Model):
     gender = models.JSONField()
     age_range = models.JSONField()
     confidence = models.FloatField()
-    embedding = models.TextField(blank=True, null=True)  # This field type is a guess.
+    embedding = VectorField(dimensions=512)
     merged_to = models.BigIntegerField(blank=True, null=True)
     thumbnail_id = models.IntegerField(blank=True, null=True)
     thumbnail_offset = models.IntegerField(blank=True, null=True)
@@ -53,9 +54,9 @@ class FbxFace(models.Model):
         return f"{str(self.file.file_id).zfill(6)}_{str(self.face_id).zfill(6)}.jpg"
 
 
-class FbxFile(models.Model):
+class MboxFile(models.Model):
     file_id = models.AutoField(primary_key=True)
-    folder = models.ForeignKey('FbxFolder', models.DO_NOTHING)
+    folder = models.ForeignKey('MboxFolder', models.DO_NOTHING)
     name = models.CharField(max_length=64)
     storage_key = models.CharField(max_length=255)
     extension = models.CharField(max_length=16)
@@ -110,7 +111,7 @@ class FbxFile(models.Model):
         db_table = 'mbox_file'
 
 
-class FbxFolder(models.Model):
+class MboxFolder(models.Model):
     folder_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=64)
     path = models.CharField(max_length=2048)
@@ -148,7 +149,7 @@ class FbxFolder(models.Model):
         db_table = 'mbox_folder'
 
 
-class FbxPerson(models.Model):
+class MboxPerson(models.Model):
     person_id = models.AutoField(primary_key=True)
     full_name = models.CharField(max_length=128)
     last_name = models.CharField(max_length=64, blank=True, null=True)
@@ -157,8 +158,8 @@ class FbxPerson(models.Model):
     birth_country = models.CharField(max_length=64, blank=True, null=True)
     birth_city = models.CharField(max_length=64, blank=True, null=True)
     birth_date = models.DateField(blank=True, null=True)
-    face = models.TextField(blank=True, null=True)  # This field type is a guess.
-    voice = models.TextField(blank=True, null=True)  # This field type is a guess.
+    face = VectorField(dimensions=512)
+    voice = VectorField(dimensions=512)
     box = models.JSONField(blank=True, null=True)
     pose = models.JSONField(blank=True, null=True)
     quality = models.JSONField(blank=True, null=True)
@@ -174,21 +175,21 @@ class FbxPerson(models.Model):
         db_table = 'mbox_person'
 
 
-class FbxVoice(models.Model):
+class MboxVoice(models.Model):
     voice_id = models.BigAutoField(primary_key=True)
-    file = models.ForeignKey(FbxFile, models.DO_NOTHING)
-    person = models.ForeignKey(FbxPerson, models.DO_NOTHING, blank=True, null=True)
+    file = models.ForeignKey(MboxFile, models.DO_NOTHING)
+    person = models.ForeignKey(MboxPerson, models.DO_NOTHING, blank=True, null=True)
     speaker = models.CharField(max_length=12)
     time_start = models.FloatField()
     time_end = models.FloatField()
-    embedding = models.TextField(blank=True, null=True)  # This field type is a guess.
+    embedding = VectorField(dimensions=512)
 
     class Meta:
         managed = False
         db_table = 'mbox_voice'
 
 
-class FbxThumbnail(models.Model):
+class MboxThumbnail(models.Model):
     thumbnail_id = models.AutoField(primary_key=True)
     label = models.CharField(max_length=32)
     path = models.CharField(max_length=255)
@@ -198,3 +199,20 @@ class FbxThumbnail(models.Model):
     class Meta:
         managed = False
         db_table = 'mbox_thumbnail'
+
+
+class MboxTranscript(models.Model):
+    chunk_id = models.AutoField(primary_key=True)
+    file = models.ForeignKey('MboxFile', models.DO_NOTHING)
+    chunk = models.TextField(blank=True, null=True)
+    embedding = VectorField(dimensions=512)
+    source = models.CharField(max_length=1)
+    time_start = models.FloatField()
+    time_end = models.FloatField()
+    thumbnail_id = models.IntegerField(blank=True, null=True)
+    thumbnail_offset = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'mbox_transcript'
+

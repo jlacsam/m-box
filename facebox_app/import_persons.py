@@ -42,9 +42,8 @@ def import_from_json(conn, input_path):
         # Find the face_id that most similar
         person_uuid = record['person_uuid']
         face_vector = record['face']
-        face_vector_str = str(face_vector).replace('[','{').replace(']','}')
         query = f"SELECT face_id FROM mbox_face WHERE person_uuid = %s ORDER BY embedding <=> %s::vector LIMIT 1"
-        cursor.execute(query, (person_uuid, face_vector_str))
+        cursor.execute(query, (person_uuid, face_vector))
         face_id = cursor.fetchone()[0]
         record['face_id'] = face_id
             
