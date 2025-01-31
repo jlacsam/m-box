@@ -30,7 +30,7 @@ def get_db_config(filename='params.cfg', section='postgresql'):
 def get_file(conn, path_name, filename):
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT f.file_id, d.path_name, f.name
+        SELECT f.file_id, d.path_name, f.name, f.media_type
         FROM mbox_file f JOIN mbox_folder d ON f.folder_id = d.folder_id
         WHERE d.path_name = %s AND f.name = %s
     """, (path_name, filename))
@@ -172,21 +172,15 @@ def load_metadata(filename):
             }
     return metadata_dict
 
+
 def load_attributes(attributes_file):
     attribs_dict = {}
     with open(attributes_file, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
+        headers = reader.fieldnames
         for row in reader:
             filename = row['filename']
-            attribs_dict[filename] = {
-                'filename': row['filename'],
-                'length': row['length'],
-                'audio_channels': row['audio_channels'],
-                'audio_sample_rate': row['audio_sample_rate'],
-                'video_resolution': row['video_resolution'],
-                'frame_rate': row['frame_rate'],
-                'file_size': row['file_size']
-            }
+            attribs_dict[filename] = {header: row[header] for header in headers}
     return attribs_dict
 
 
@@ -334,9 +328,9 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
 
     # Update owner and group of container
     affected = update_folder_owner(conn, folder_id, owner_id, owner_name)
-    print(f"Folder owner of container is {'updated' if affected else 'unchanged'}.")
+    print(f"Folder owner of {container} is {'updated' if affected else 'unchanged'}.")
     affected = update_folder_group(conn, folder_id, group_id, group_name)
-    print(f"Folder group of container is {'updated' if affected else 'unchanged'}.")
+    print(f"Folder group of {container} is {'updated' if affected else 'unchanged'}.")
 
     # Get/Create an mbox folder for this folder/batch
     path_name = f"{container}/{folder}"
@@ -349,11 +343,11 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
 
     # Update owner and group of folder
     affected = update_folder_owner(conn, folder_id, owner_id, owner_name)
-    print(f"Folder owner of container is {'updated' if affected else 'unchanged'}.")
+    print(f"Folder owner of {folder} is {'updated' if affected else 'unchanged'}.")
     affected = update_folder_group(conn, folder_id, group_id, group_name)
-    print(f"Folder group of container is {'updated' if affected else 'unchanged'}.")
+    print(f"Folder group of {folder} is {'updated' if affected else 'unchanged'}.")
 
-    # Load video uris, attribs & metadata
+    # Load file uris, attribs & metadata
     filename = f"{data_dir}/{container}/{container}__{folder}.uri"
     uris_dict = load_uris(filename)
 
@@ -388,7 +382,17 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
 
         if record is None:
             # Get the media type based on the file extension
-            media_type = 'video' if media_file.endswith('mp4') else 'audio'
+            media_type = 'video' 
+            if media_file.endswith(('.mp4','.mov')):
+               media_type = 'video'
+            elif media_file.endswith(('.mp3','.wav')):
+               media_type = 'audio'
+            elif media_file.endswith(('.jpg','.jpeg','.png')):
+               media_type = 'photo'
+            elif media_file.endswith(('.pdf','.doc','docx','.xls','.xlsx','.ppt','.pptx')):
+               media_type = 'document'
+            else:
+               media_type = 'unknown'
 
             # Insert a new record in the mbox_file table
             print(f"Adding {path_name}/{media_file} ...")
@@ -396,37 +400,38 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
             count_inserted += 1
         else:
             file_id = record[0]
-
-        syn_file_path = os.path.join(captions_dir, f"{basename}.syn")
-        vtt_file_path = os.path.join(captions_dir, f"{basename}.vtt")
-        pp_file_path = os.path.join(captions_dir, f"{basename}.pp")
-        emb_file_path = os.path.join(captions_dir, f"{basename}.emb")
-        off_file_path = os.path.join(captions_dir, f"{basename}.offsets")
+            media_type = record[3]
 
         # Read contents of .syn file
+        syn_file_path = os.path.join(captions_dir, f"{basename}.syn")
         with open(syn_file_path, 'r', encoding='utf-8') as syn_file:
             syn_content = syn_file.read()
 
         # Read contents of .vtt file
+        vtt_file_path = os.path.join(captions_dir, f"{basename}.vtt")
         with open(vtt_file_path, 'r', encoding='utf-8') as vtt_file:
             vtt_content = vtt_file.read()
 
         # Read contents of .pp file
+        pp_file_path = os.path.join(captions_dir, f"{basename}.pp")
         with open(pp_file_path, 'r', encoding='utf-8') as pp_file:
             pp_content = json.load(pp_file)
             people = pp_content['people']
             places = pp_content['places']
 
         # Read contents of .emb file
+        emb_file_path = os.path.join(captions_dir, f"{basename}.emb")
         with open(emb_file_path, 'r', encoding='utf-8') as emb_file:
             emb_content = json.load(emb_file)
             chunks = emb_content.get('chunks',[])
 
         # Read the contents of the .offsets file
-        with open(off_file_path, 'r', encoding='utf-8') as off_file:
-            offsets = json.load(off_file)
+        if media_type == 'video':
+            off_file_path = os.path.join(captions_dir, f"{basename}.offsets")
+            with open(off_file_path, 'r', encoding='utf-8') as off_file:
+                offsets = json.load(off_file)
 
-        # Get the file size of the video/audio
+        # Get the file size of the video/audio/photo/document
         id = media_file
         file_size = attribs_dict[id]['file_size']
 
@@ -448,12 +453,13 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
         if not has_embeddings(conn, file_id): 
             print(f"Inserting transcript embeddings for {path_name}/{media_file} ...")
             insert_embeddings(conn, file_id, chunks)
-            thumbnail = get_thumbnail(conn, container, folder)
-            if thumbnail is None:
-                thumbnail_id = insert_dat(conn, file_id, container, folder)
-            else:
-                thumbnail_id = thumbnail[0]
-            update_offsets(conn, thumbnail_id, file_id, offsets)
+            if media_type == 'video':
+                thumbnail = get_thumbnail(conn, container, folder)
+                if thumbnail is None:
+                    thumbnail_id = insert_dat(conn, file_id, container, folder)
+                else:
+                    thumbnail_id = thumbnail[0]
+                update_offsets(conn, thumbnail_id, file_id, offsets)
             count_upd3 += 1
         else:
             print(f"Skipping transcript embeddings for {path_name}/{media_file} ...")
@@ -474,10 +480,10 @@ if __name__ == "__main__":
     parser.add_argument("data_dir", help="Directory where the container/bucket folder is.")
     parser.add_argument("bucket", help="AWS S3 bucket name where asset folders are.")
     parser.add_argument("folder", help="AWS S3 bucket folder where assets are stored.")
-    parser.add_argument("--owner", type=str, default=DEFAULT_OWNER_NAME help="Owner name assigned to new assets.")
-    parser.add_argument("--group", type=str, default=DEFAULT_GROUP_NAME help="Group name assigned to new assets.")
+    parser.add_argument("--owner", type=str, default=DEFAULT_OWNER_NAME, help="Owner name assigned to new assets.")
+    parser.add_argument("--group", type=str, default=DEFAULT_GROUP_NAME, help="Group name assigned to new assets.")
 
-    ars.parser.parse_args()
+    args = parser.parse_args()
 
     if not os.path.isdir(args.data_dir):
         print(f"The path {data_dir} is not a valid directory.")

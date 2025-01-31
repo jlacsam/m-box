@@ -332,7 +332,7 @@
                        { "Max-Rows" : 10 },
                        { "Start-From" : 0 } ],
       "parameters" : [],
-      "body"       : { "content-type=image/jpeg" },
+      "body"       : { "Content-Type" : "content-type=image/jpeg" },
       "outputs"    : [ { "results" : "records" }, { "error" : "error description" } ],
       "status"     : "V1.0"
     },

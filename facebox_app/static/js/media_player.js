@@ -198,8 +198,9 @@ function showEditor(editable,inputtype='textarea',options=[]) {
     editorDiv.classList.add('editor-visible');
 
     const rect = editable.getBoundingClientRect();
-    editorDiv.style.width = rect.width + 'px';
-    editorDiv.style.height = rect.height + 'px';
+    editorDiv.style.width = (rect.width) + 'px';
+    editorDiv.style.height = (rect.height+8) + 'px'; // Space for margins
+    editorText.style.width = (rect.width-48) + 'px'; // Space for the buttons
 
     // Store the value of the editable into an attribute
     key = editable.id.split('-')[1];
@@ -575,7 +576,6 @@ function showMedia(data) {
     } else if (q_file_name == 'audio') {
         const audioPlayer = document.getElementById('audio-player');
         audioPlayer.src = data.file_url;
-        audioPlayer.style.width = '100%';
         audioPlayer.load();
     }
 }

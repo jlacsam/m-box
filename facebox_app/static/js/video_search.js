@@ -430,16 +430,18 @@ function doSemanticSearch(text, scope = "/") {
 }
 
 // =======
-function openVideoPopup(videoUrl, startTime) {
+function openVideoPopup(videoUrl, fileName, title, description, startTime=0) {
   const popup = document.createElement("div");
   popup.className = "video-popup";
   popup.innerHTML = `
         <div class="popup-content">
           <button class="close-popup" onclick="closeVideoPopup()">X</button>
+          <h3>${title || fileName}</h3>
           <video controls >
             <source src="${videoUrl}#t=${startTime}" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
+          <div class="popup-text">${description}</div>
         </div>`;
   document.body.appendChild(popup);
 }
@@ -460,7 +462,6 @@ function displayResultsTiles(data, append = false) {
   }
 
   if (!Array.isArray(data) || data.length === 0) {
-    console.error("Data is empty or invalid:", data);
     resultsBodyTiles.innerHTML = "No Records Found";
     return;
   }
@@ -478,6 +479,15 @@ function displayResultsTiles(data, append = false) {
         .replaceAll("\\", "")
         .replaceAll('"', "")
         .replaceAll(",", ", ");
+
+    let description = null;
+    if (isExcerpt) {
+      description = "[" + timeToStr(item.chunk_start) + " - " + timeToStr(item.chunk_end) + "] ";
+      description += sanitizeHtml(item.description);
+    } else {
+      description = sanitizeHtml(item.description);
+    }
+
     html += `
       <div class="tile">
         <table class="tile_table">
@@ -490,6 +500,9 @@ function displayResultsTiles(data, append = false) {
                       isExcerpt ? item.chunk_id : item.file_id
                     }" src="" alt="thumbnail"    
                      data-video-url="${item.file_url}" 
+                     data-file-name="${item.file_name}"
+                     data-title="${item.title}"
+                     data-description="${description}"
                      data-start-time="${isExcerpt ? item.chunk_start : 0}" >
                   </td>
                 </tr>
@@ -531,7 +544,7 @@ function displayResultsTiles(data, append = false) {
                 <tr>
                   <td>
                     <div class="field_label">${desc_header}</div>
-                    <div class="field_value">${item.description}</div>
+                    <div class="field_value">${description}</div>
                   </td>
                 </tr>
                 <tr>
@@ -564,9 +577,11 @@ function displayResultsTiles(data, append = false) {
     thumbnail.addEventListener("click", () => {
       const videoUrl = thumbnail.getAttribute("data-video-url");
       const startTime = thumbnail.getAttribute("data-start-time");
-
+      const fileName = thumbnail.getAttribute("data-file-name");
+      const title = thumbnail.getAttribute("data-title");
+      const description = thumbnail.getAttribute("data-description");
       // Open popup and play video
-      openVideoPopup(videoUrl, startTime);
+      openVideoPopup(videoUrl, fileName, title, description, startTime);
     });
   });
   const titles = document.querySelectorAll(".title-field");
@@ -606,7 +621,7 @@ function displayResults(results) {
 
   if (results.length === 0) {
     resultsBody.innerHTML =
-      '<tr><td colspan="21">No matching records found.</td></tr>';
+      '<tr><td colspan="1">No matching records found.</td></tr>';
     return;
   }
 
@@ -670,9 +685,9 @@ function displayResults(results) {
     let description = null;
     if (isExcerpt) {
       description = "[" + timeToStr(item.chunk_start) + " - " + timeToStr(item.chunk_end) + "] ";
-      description += item.description;
+      description += sanitizeHtml(item.description);
     } else {
-      description = item.description;
+      description = sanitizeHtml(item.description);
     }
 
     let html = `
@@ -680,7 +695,11 @@ function displayResults(results) {
             <td><img class="thumbnail thumbnail_tab" id="thumbnail_${
               isExcerpt ? item.chunk_id : item.file_id
             }" src=""  data-video-url="${item.file_url}"
-              data-start-time="${isExcerpt ? item.chunk_start : 0}" alt="thumbnail"></td>
+              data-start-time="${isExcerpt ? item.chunk_start : 0}" 
+              data-file-name="${item.file_name}"
+              data-title="${item.title}"
+              data-description="${description}"
+              alt="thumbnail"></td>
             <td>${item.title ? item.title : "None"}</td>
             <td><a href="${item.file_url}" class="hyperlink" target="_blank">${
       item.file_name
@@ -734,10 +753,12 @@ function displayResults(results) {
   thumbnails.forEach((thumbnail) => {
     thumbnail.addEventListener("click", () => {
       const videoUrl = thumbnail.getAttribute("data-video-url");
+      const fileName = thumbnail.getAttribute("data-file-name");
+      const title = thumbnail.getAttribute("data-title");
+      const description = thumbnail.getAttribute("data-description");
       const startTime = thumbnail.getAttribute("data-start-time");
-
       // Open popup and play video
-      openVideoPopup(videoUrl, startTime);
+      openVideoPopup(videoUrl, fileName, title, description, startTime);
     });
   });
 }

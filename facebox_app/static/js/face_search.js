@@ -39,8 +39,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const facesTab = document.getElementById("faces-tab");
   const profileIcon = document.getElementById("profile");
 
-
-
   dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
     dropZone.classList.add("dragover");
@@ -211,16 +209,6 @@ document.addEventListener("DOMContentLoaded", function () {
     performSearch();
   });
 
-  //     mergeButton.addEventListener('click', async () => {
-  //         document.querySelector(".custom-model-main").classList.add("model-open");
-  //         const checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked');
-  //         checkedBoxes.forEach(checkbox => {
-  //     // console.log(checkbox.value); // get the value
-  //     // console.log(checkbox.name);  // get the name
-  //     console.log(checkbox.dataset.personId);
-  // });
-  //     });
-
   unlinkFacesButton.addEventListener("click", function () { 
     const selectedFaces = getSelectedFaces(); // You'll need to implement this based on your data structure
     const personsList = selectedFaces.map(face => parseInt(face.faceId));
@@ -277,7 +265,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // Insert table into the modal
     document.querySelector(".custom-model-main .table").innerHTML = tableHTML;
   });
-
 
   // Function to get selected faces (implement according to your data structure)
   function getSelectedFaces() {
@@ -363,6 +350,34 @@ document.addEventListener("DOMContentLoaded", function () {
     if (settingsMenu.classList.contains("popup-visible")) {
       settingsMenu.classList.remove("popup-visible");
       settingsMenu.classList.add("popup-hidden");
+    }
+  });
+
+  const firstName = document.getElementById("first_name");
+  const middleName = document.getElementById("middle_name");
+  const lastName = document.getElementById("last_name");
+
+  firstName.addEventListener("keyup", function (event) {
+    if (event.key === "Enter") {
+      middleName.focus();
+    } else if (event.key === "Escape") {
+      cancelEdits();
+    }
+  });
+
+  middleName.addEventListener("keyup", function (event) {
+    if (event.key === "Enter") {
+      lastName.focus();
+    } else if (event.key === "Escape") {
+      cancelEdits();
+    }
+  });
+
+  lastName.addEventListener("keyup", function (event) {
+    if (event.key === "Enter") {
+      saveEdits();
+    } else if (event.key === "Escape") {
+      cancelEdits();
     }
   });
 
@@ -866,7 +881,6 @@ function closeVideoPopup() {
 // Search Faces thumbnail click popup end=================
 // ====After Search Faces Tiles Shown below code=====
 function displayPersonTiles(data, append = false) {
-  console.log(mergeCheckBox)
   let html = "";
   const items = data.results;
   items.forEach((item) => {
@@ -986,7 +1000,6 @@ function displayPersonTiles(data, append = false) {
 }
 // ====After Search Faces Tiles Shown code end=====
 function displayThumbnails(data) {
-  console.log(mergeCheckBox)
   const csrftoken = getCookie("csrftoken");
   const items = data.results;
   items.forEach((item) => {
@@ -1190,6 +1203,9 @@ function showEditor(editable) {
   const rect = editable.getBoundingClientRect();
   editorDiv.style.width = rect.width + "px";
   editorDiv.style.height = rect.height + "px";
+  editorFN.style.width = (rect.width-48)/3 + "px";
+  editorMN.style.width = (rect.width-48)/3 + "px";
+  editorLN.style.width = (rect.width-48)/3 + "px";
 
   // Store the value of the editable into an attribute
   editorDiv.setAttribute("original-id", editable.id);
@@ -1200,6 +1216,9 @@ function showEditor(editable) {
   // Remove the editorDiv from its current parent, then append to a new parent
   editorDiv.remove();
   editable.appendChild(editorDiv);
+
+  // Bring the focus to the first name field
+  editorFN.focus();
 }
 
 function saveEdits() {

@@ -12,7 +12,6 @@ let maxRows = 25;
 
 $.fn.dataTable.ext.errMode = 'none';
 
-
 document.addEventListener("DOMContentLoaded", function () {
   const searchBox = document.getElementById("search-box");
   const searchButton = document.getElementById("search-button");
@@ -38,6 +37,19 @@ document.addEventListener("DOMContentLoaded", function () {
   searchBox.addEventListener("keyup", function (event) {
     if (event.key === "Enter") {
       performSearch();
+    } else if (searchBox.value.length > 1) {
+      if (isSemantic(searchBox.value) > 0) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.add('semantic-search');
+      } else if (isProperlyQuotedOrUnquoted(searchBox.value)) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.remove('semantic-search');
+      } else {
+        searchBox.classList.add('invalid-search');
+      }
+    } else {
+      searchBox.classList.remove('invalid-search');
+      searchBox.classList.remove('semantic-search');
     }
   });
 
@@ -92,6 +104,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // Get initial folder
+  savedFolder = getCookie('currentFolder');
+  if (savedFolder != null) currentFolder = savedFolder;
+  const breadCrumbs = document.getElementById("bread-crumbs");
+  breadCrumbs.innerHTML = currentFolder == '/' ? '[all folders]' : currentFolder;
+  updatePlaceholder();
+
   audiosTab.style.color = "#ffffff";
 
   setMaxRows(maxRows);
@@ -99,7 +118,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Initial load
   performSearch();
-  // applyFilters()
 });
 
 function getGroups() {
@@ -150,16 +168,22 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
     */
   const searchBox = document.getElementById("search-box");
   let value = searchBox.value.trim();
+
   currentPage = 1;
-  if (value.length == 0 || isValidTsQueryString(value)) {
-    searchAudios(value, currentFolder);
-  } else if (isUnquoted(value) && containsSpace(value)) {
-    // make the search string a valid TsQuery. Assume OR.
-    value = trimWhitespaces(value).replaceAll(" ", " | ");
-    searchAudios(value, currentFolder);
-    applyFilters();
+
+  if (isSemantic(value) > 0) {
+    doSemanticSearch(value, currentFolder);
   } else {
-    alert("Invalid search string.");
+    if (value.length == 0 || isValidTsQueryString(value)) {
+      searchAudios(value, currentFolder);
+    } else if (isUnquoted(value) && containsSpace(value)) {
+      // make the search string a valid TsQuery. Assume OR.
+      value = trimWhitespaces(value).replaceAll(" ", " | ");
+      searchAudios(value, currentFolder);
+      applyFilters();
+    } else {
+      alert("Invalid search string.");
+    }
   }
 }
 
@@ -178,60 +202,41 @@ function resetPage() {
   updatePlaceholder();
   currentPage = 1;
   searchAudios("", currentFolder);
-//   applyFilters();
 }
 
 function applyFilters() {
-  $(document).ready(function () {
-    if ($.fn.dataTable.isDataTable("#results-table")) {
-      table = $("#results-table").DataTable();
-      const tableTag = document.getElementById("results-table");
-      tableTag.style.visibility = "visible";
-      table.destroy();
-      $("#results-table").DataTable({
-        paging: false,
-        searching: false,
-        info: false,
-        // fixedHeader: true,
-        ordering: true,
-        order: [[0, "asc"]],
-        dom: "Bfrtip",
-        columnDefs: [
-          {
-            targets: [3, 4, 5, 6, 7, 9, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
-            visible: false,
-          },
-          {
-            targets: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
-            orderable: false
-          }
-        ],
-      });
-    } else {
-      $("#results-table").DataTable({
-        paging: false,
-        searching: false,
-        // fixedHeader: true,
-        info: false,
-        ordering: true,
-        order: [[0, "asc"]],
-        dom: "Bfrtip",
-        columnDefs: [
-          {
-            targets: [3, 4, 5, 6, 7, 9, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
-            visible: false,
-          },
-          {
-            targets: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
-            orderable: false
-          }
-        ],
-      });
-    }
+    $(document).ready(() => {
+        // Common DataTable configuration
+        const config = {
+            paging: false,
+            searching: false,
+            ordering: true,
+            info: false,
+            order: [[0, "asc"]],
+            dom: "Bfrtip",
+            columnDefs: [
+                {
+                    targets: [3, 4, 5, 6, 7, 9, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
+                    visible: false
+                },
+                {
+                    targets: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28],
+                    orderable: false
+                }
+            ]
+        };
+
+        // Destroy existing table if it exists
+        if ($.fn.dataTable.isDataTable("#results-table")) {
+            $("#results-table").DataTable().destroy();
+        }
+
+        // Initialize table with config
+        $("#results-table").DataTable(config);
+
         // Add custom column visibility button
         addColumnVisibilityButton();
-
-  });
+    });
 }
 
 // Add this new function to create and handle the custom button
@@ -355,6 +360,7 @@ function searchAudios(pattern = "", scope = "/") {
       if (data.error) {
         displayError(data.error);
       } else {
+        document.getElementById("desc-header").innerHTML = "Description";
         recordSet = data.results;
         displayResults(data.results);
         highlightWords(dequote(pattern));
@@ -373,74 +379,153 @@ function searchAudios(pattern = "", scope = "/") {
       displayError("An error occurred while fetching data.");
     });
 }
-// ==============Table will display audio list===========
+
+function doSemanticSearch(text, scope = "/") {
+  const csrftoken = getCookie("csrftoken");
+  const offset = (currentPage - 1) * maxRows;
+
+  table = $("#results-table").DataTable();
+  table.destroy();
+
+  let pair = {};
+  pair['text'] = text;
+
+  fetch("/api/search-transcript/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrftoken,
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "Media-Type": "audio",
+      "Scope": scope,
+      "Max-Rows": maxRows,
+      "Start-From": offset,
+    },
+    body: JSON.stringify(pair)
+  })
+  .then((response) => response.json())
+  .then((data) => {
+    if (data.error) {
+      displayError(data.error);
+    } else {
+      document.getElementById("desc-header").innerHTML = "Excerpt";
+      recordSet = data.results;
+      displayResults(data.results);
+      updatePagination(data.results);
+      if (data.results.length == 0) {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = "No Records Found";
+      } else {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = `Showing ${offset + 1} to ${offset + recordSet.length} Records`;
+      }
+    }
+  })
+  .catch((error) => {
+    console.log(error);
+    displayError("An error occurred while fetching data.");
+  });
+}
+
+// =======
+function openVideoPopup(videoUrl, startTime) {
+  const popup = document.createElement("div");
+  popup.className = "video-popup";
+  popup.innerHTML = `
+        <div class="popup-content">
+          <button class="close-popup" onclick="closeVideoPopup()">X</button>
+          <video controls >
+            <source src="${videoUrl}#t=${startTime}" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>`;
+  document.body.appendChild(popup);
+}
+
+function closeVideoPopup() {
+  const popup = document.querySelector(".video-popup");
+  if (popup) {
+    popup.remove();
+  }
+}
+
 function displayResultsTiles(data, append = false) {
-  // console.log("-===--->", data);
   const resultsBodyTiles = document.getElementById("tiles-results-audio");
-  resultsBodyTiles.innerHTML = ""
   if (!resultsBodyTiles) {
+    console.error("Element with ID 'tiles-results-audio' not found");
     resultsBodyTiles.innerHTML = "No Records Found";
-    console.error("Element with ID 'tiles-results-photo' not found");
     return;
   }
 
   if (!Array.isArray(data) || data.length === 0) {
-    console.error("Data is empty or invalid:", data);
     resultsBodyTiles.innerHTML = "No Records Found";
     return;
   }
 
   let html = "";
+  let desc_header = document.getElementById('desc-header').innerHTML;
+  let isExcerpt = desc_header.includes('Excerpt');
 
   data.forEach((item) => {
     let tags = item.tags ? customTrim(item.tags, "[]") : "";
+    let description = null;
+    if (isExcerpt) {
+      description = "[" + timeToStr(item.chunk_start) + " - " + timeToStr(item.chunk_end) + "] ";
+      description += sanitizeHtml(item.description);
+    } else {
+      description = sanitizeHtml(item.description) || "";
+    }
     html += `
         <div class="tile">
           <table class="tile_table">
             <tr class="title-field" data-file-id-tile="${
               item.file_id
             }" data-audio-filename="${item.file_name}">
-              <td>
+              <td class="audio-thumbnail-td">
                 <table>
                   <tr>
                     <td>
-                      <img class="cursor-pointer thumbnail thumbnail-tile-photo" id="thumbnail_tiles${
+                      <img class="cursor-pointer audio-thumbnail thumbnail-tile-photo" id="thumbnail_tiles${
                         item.file_id
                       }" 
-                           src="${"https://cdn-icons-png.flaticon.com/256/4396/4396058.png"}" alt="thumbnail"
-                           data-audio-url="${item.file_url}" data-audio-filename="${item.file_name}" data-audio-title="${item.title || "None"}">
+                           src="${"/static/images/audio_reel.jpg"}" alt="thumbnail"
+                           data-audio-url="${item.file_url}" 
+                           data-audio-filename="${item.file_name}" 
+                           data-start-time="${isExcerpt ? item.chunk_start : 0}"
+                           data-audio-title="${item.title || "None"}" >
                     </td>
                   </tr>
                 </table>
-              </td>
-              <td>
-                <table class="table_fields px-3">
+            </td>
+            <td>
+              <table class="table_fields px-3">
                   <tr>
-                    <td>
-                      <div class="field_label">Title</div>
-                      <div class="field_value">${item.title || "None"}</div>
+                  <td>
+                    <div class="field_label">Title</div>
+                    <div class="field_value">${item.title || "None"}</div>
                     </td>
                   </tr>
                   <tr>
                     <td>
-                      <div class="field_label">Description</div>
-                      <div class="field_value">${
-                        item.description || "N/A"
+                    <div class="field_label">${desc_header}</div>
+                    <div class="field_value">${
+                        description || "N/A"
                       }</div>
-                    </td>
-                  </tr>
-                   <tr>
-                    <td>
-                      <div class="field_label">Tags</div>
-                      <div class="field_value">${tags || "N/A"}</div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </div>
-      `;
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="field_label">Tags</div>
+                    <div class="field_value">${tags || "N/A"}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
   });
 
   if (append) {
@@ -455,8 +540,9 @@ function displayResultsTiles(data, append = false) {
       const imageUrl = thumbnail.getAttribute("data-audio-url");
       const filename = thumbnail.getAttribute("data-audio-filename");
       const title = thumbnail.getAttribute("data-audio-title");
+      const startTime = thumbnail.getAttribute("data-start-time");
       if (imageUrl) {
-        openAudioPopup(imageUrl, filename, title);
+        openAudioPopup(imageUrl, filename, title, startTime);
       } else {
         console.error("Image URL is invalid or missing.");
       }
@@ -468,6 +554,8 @@ function displayResults(results) {
   table = $("#results-table").DataTable();
   table.destroy();
   const resultsBody = document.getElementById("results-body");
+  const isExcerpt = document.getElementById('desc-header').innerHTML.includes('Excerpt');
+
   resultsBody.innerHTML = "";
   displayResultsTiles(results);
   if (results == null) {
@@ -478,14 +566,13 @@ function displayResults(results) {
 
   if (results.length === 0) {
     resultsBody.innerHTML =
-      '<tr><td colspan="20">No matching records found.</td></tr>';
+      '<tr><td colspan="29">No matching records found.</td></tr>';
     return;
   }
 
   results.forEach((item) => {
     const row = document.createElement("tr");
     row.id = "row_" + item.file_id;
-
     row.addEventListener("dblclick", function () {
       window.open(
         "/app/media-player/?file_id=" + item.file_id + "&file_name=audio",
@@ -515,6 +602,14 @@ function displayResults(results) {
     let tags = item.tags ? customTrim(item.tags, "[]") : "";
     let texts = item.texts ? customTrim(item.texts, "[]") : "";
 
+    let description = null;
+    if (isExcerpt) {
+      description = "[" + timeToStr(item.chunk_start) + " - " + timeToStr(item.chunk_end) + "] ";
+      description += sanitizeHtml(item.description);
+    } else {
+      description = sanitizeHtml(item.description);
+    }
+
     let html = `
                 <td>${item.file_id}</td>
                 <td>${item.title}</td>
@@ -536,7 +631,7 @@ function displayResults(results) {
                 <td>${formatDate(item.date_uploaded)}</td>`;
     if (item.description == null)
       html += `<td class='field-description'>&nbsp;</td>`;
-    else html += `<td class='field-description'>${item.description}</td>`;
+    else html += `<td class='field-description'>${description}</td>`;
     html += `
                 <td>${tags}</td>
                 <td>${people}</td>
@@ -587,7 +682,7 @@ document.getElementById("toggleViewBtn").addEventListener("click", function () {
   }
 });
 // Function to open an audio popup
-function openAudioPopup(audioUrl, fileName, title) {
+function openAudioPopup(audioUrl, fileName, title, startTime=0) {
   const popup = document.createElement("div");
   popup.className = "audio-popup";
   popup.innerHTML = `
@@ -595,7 +690,7 @@ function openAudioPopup(audioUrl, fileName, title) {
           <button class="close-popup" onclick="closeAudioPopup()">X</button>
           <h3>${title || fileName}</h3>
           <audio controls>
-            <source src="${audioUrl}" type="audio/mpeg">
+            <source src="${audioUrl}#t=${startTime}" type="audio/mpeg">
             Your browser does not support the audio element.
           </audio>
         </div>`;
@@ -682,7 +777,6 @@ function goToPage(direction) {
       break;
   }
   searchAudios(document.getElementById("search-box").value, currentFolder);
-//   applyFilters();
 }
 
 function displayError(message) {
@@ -816,6 +910,7 @@ function selectFolder(folder) {
   updatePlaceholder();
   performSearch();
   applyFilters();
+  setCookie('currentFolder',currentFolder,7*24*60*60);
 }
 
 function setMaxRows(value) {
