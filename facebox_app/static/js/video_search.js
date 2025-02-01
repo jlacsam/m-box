@@ -3,12 +3,14 @@ const CLIENT_SECRET = "00000000";
 const FOLDER_ICON = "\u{1F4C1}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
+const DEFAULT_HIDDEN_COLUMNS = [4,5,6,7,8,10,13,14,15,16,17,18,20,21,22,23,24,25,26,27,28,29,30]; 
 
 let currentPage = 1;
 let totalPages = 1;
 let recordSet = null;
 let currentFolder = "/";
 let maxRows = 25;
+let hiddenColumns = new Set(DEFAULT_HIDDEN_COLUMNS);
 
 $.fn.dataTable.ext.errMode = 'none';
 
@@ -105,15 +107,23 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Get initial folder
-  savedFolder = getCookie('currentFolder');
+  savedFolder = getCookie('VideoBox.currentFolder');
   if (savedFolder != null) currentFolder = savedFolder;
   const breadCrumbs = document.getElementById("bread-crumbs");
   breadCrumbs.innerHTML = currentFolder == '/' ? '[all folders]' : currentFolder;
   updatePlaceholder();
 
+  // Get initial hidden columns
+  savedHiddenColumns = getCookie('VideoBox.hiddenColumns');
+  if (savedHiddenColumns) hiddenColumns = new Set(JSON.parse(savedHiddenColumns));
+
+  // Get initial max rows
+  savedMaxRows = getCookie('VideoBox.maxRows');
+  if (savedMaxRows) maxRows = parseInt(savedMaxRows);
+  setMaxRows(maxRows);
+
   videosTab.style.color = "#ffffff";
 
-  setMaxRows(maxRows);
   getGroups();
 
   // Initial load
@@ -151,7 +161,7 @@ function displayGroups(groups) {
   userGroups.innerHTML = html;
 }
 
-function performSearch() {
+function performSearch(resetCurrentPage=true) {
   /* Valid cases:
        Empty search string = get all records
        Improperly quoted - error
@@ -169,7 +179,9 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
   const searchBox = document.getElementById("search-box");
   let value = searchBox.value.trim();
 
-  currentPage = 1;
+  if (resetCurrentPage) {
+    currentPage = 1;
+  }
 
   if (isSemantic(value) > 0) {
     doSemanticSearch(value, currentFolder);
@@ -215,7 +227,7 @@ function applyFilters() {
             dom: "Bfrtip",
             columnDefs: [
                 {
-                    targets: [4,5,6,7,8,10,13,14,15,16,17,18,20,21,22,23,24,25,26,27,28,29,30],
+                    targets: Array.from(hiddenColumns).sort((a, b) => a - b),
                     visible: false
                 },
                 {
@@ -302,6 +314,14 @@ function initializeColumnVisibility() {
         
         checkbox.addEventListener('change', function() {
           col.visible(this.checked);
+          if (this.checked) {
+             if (hiddenColumns.has(colIdx)) 
+                 hiddenColumns.delete(colIdx);
+          } else {
+             if (!hiddenColumns.has(colIdx)) 
+                 hiddenColumns.add(colIdx);
+          }
+          setCookie('VideoBox.hiddenColumns',JSON.stringify(Array.from(hiddenColumns)));
         });
         
         div.appendChild(checkbox);
@@ -946,7 +966,7 @@ function goToPage(direction) {
       currentPage++;
       break;
   }
-  searchVideos(document.getElementById("search-box").value, currentFolder);
+  performSearch(false);
 }
 
 function displayError(message) {
@@ -1081,7 +1101,7 @@ function selectFolder(folder) {
   updatePlaceholder();
   performSearch();
   applyFilters();
-  setCookie('currentFolder',currentFolder,7*24*60*60);
+  setCookie('VideoBox.currentFolder',currentFolder,7*24*60*60);
 }
 
 function setMaxRows(value) {
@@ -1091,6 +1111,7 @@ function setMaxRows(value) {
   maxRowsLIs.forEach((li) => {
     if (li.id == "li-" + maxRows.toString()) {
       li.style.listStyleType = "disc";
+      setCookie("VideoBox.maxRows",value);
     } else {
       li.style.listStyleType = "none";
     }

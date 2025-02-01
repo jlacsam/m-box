@@ -3,12 +3,14 @@ const CLIENT_SECRET = "00000000";
 const FOLDER_ICON = "\u{1F4C1}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
+const DEFAULT_HIDDEN_COLUMNS = [4,5,6,7,8,11,12,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30];
 
 let currentPage = 1;
 let totalPages = 1;
 let recordSet = null;
 let currentFolder = "/";
 let maxRows = 25;
+let hiddenColumns = new Set(DEFAULT_HIDDEN_COLUMNS);
 
 $.fn.dataTable.ext.errMode = 'none';
 
@@ -37,6 +39,19 @@ document.addEventListener("DOMContentLoaded", function () {
   searchBox.addEventListener("keyup", function (event) {
     if (event.key === "Enter") {
       performSearch();
+    } else if (searchBox.value.length > 1) {
+      if (isSemantic(searchBox.value) > 0) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.add('semantic-search');
+      } else if (isProperlyQuotedOrUnquoted(searchBox.value)) {
+        searchBox.classList.remove('invalid-search');
+        searchBox.classList.remove('semantic-search');
+      } else {
+        searchBox.classList.add('invalid-search');
+      }
+    } else {
+      searchBox.classList.remove('invalid-search');
+      searchBox.classList.remove('semantic-search');
     }
   });
 
@@ -91,9 +106,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // Get initial folder
+  savedFolder = getCookie('VideoBox.currentFolder');
+  if (savedFolder != null) currentFolder = savedFolder;
+  const breadCrumbs = document.getElementById("bread-crumbs");
+  breadCrumbs.innerHTML = currentFolder == '/' ? '[all folders]' : currentFolder;
+  updatePlaceholder();
+
+  // Get initial hidden columns
+  savedHiddenColumns = getCookie('VideoBox.hiddenColumns');
+  if (savedHiddenColumns) hiddenColumns = new Set(JSON.parse(savedHiddenColumns));
+
+  // Get initial max rows
+  savedMaxRows = getCookie('VideoBox.maxRows');
+  if (savedMaxRows) maxRows = parseInt(savedMaxRows);
+  setMaxRows(maxRows);
+
   photosTab.style.color = "#ffffff";
 
-  setMaxRows(maxRows);
   getGroups();
 
   // Initial load
@@ -131,7 +161,7 @@ function displayGroups(groups) {
   userGroups.innerHTML = html;
 }
 
-function performSearch() {
+function performSearch(resetCurrentPage=true) {
   /* Valid cases:
        Empty search string = get all records
        Improperly quoted - error
@@ -148,15 +178,23 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
     */
   const searchBox = document.getElementById("search-box");
   let value = searchBox.value.trim();
-  currentPage = 1;
-  if (value.length == 0 || isValidTsQueryString(value)) {
-    searchPhotos(value, currentFolder);
-  } else if (isUnquoted(value) && containsSpace(value)) {
-    // make the search string a valid TsQuery. Assume OR.
-    value = trimWhitespaces(value).replaceAll(" ", " | ");
-    searchPhotos(value, currentFolder);
+
+  if (resetCurrentPage) {
+    currentPage = 1;
+  }
+
+  if (isSemantic(value) > 0) {
+    doSemanticSearch(value, currentFolder);
   } else {
-    alert("Invalid search string.");
+    if (value.length == 0 || isValidTsQueryString(value)) {
+      searchPhotos(value, currentFolder);
+    } else if (isUnquoted(value) && containsSpace(value)) {
+      // make the search string a valid TsQuery. Assume OR.
+      value = trimWhitespaces(value).replaceAll(" ", " | ");
+      searchPhotos(value, currentFolder);
+    } else {
+      alert("Invalid search string.");
+    }
   }
 }
 
@@ -178,53 +216,38 @@ function resetPage() {
 }
 
 function applyFilters() {
-  $(document).ready(function () {
-    if ($.fn.dataTable.isDataTable("#results-table")) {
-      table = $("#results-table").DataTable();
-      table.destroy();
-      $("#results-table").DataTable({
-        paging: false,
-        searching: false,
-        info: false,
-        fixedHeader: true,
-        ordering: true,
-        order: [[0, "asc"]],
-        dom: "Bfrtip",
-        columnDefs: [
-          {
-            targets: [4, 5, 6, 7, 8, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28, 29, 30],
-            visible: false,
-          },
-          {
-            targets: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28, 29, 30],
-            orderable: false
-          }
-        ],
-      });
-    } else {
-      $("#results-table").DataTable({
-        paging: false,
-        searching: false,
-        info: false,
-        fixedHeader: true,
-        ordering: true,
-        order: [[0, "asc"]],
-        dom: "Bfrtip",
-        columnDefs: [
-          {
-            targets: [4, 5, 6, 7, 8, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28, 29, 30],
-            visible: false,
-          },
-          {
-            targets: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,25,26,27,28, 29, 30],
-            orderable: false
-          }
-        ],
-      });
-    }
+    $(document).ready(() => {
+        // Common DataTable configuration
+        const config = {
+            paging: false,
+            searching: false,
+            ordering: true,
+            info: false,
+            order: [[0, "asc"]],
+            dom: "Bfrtip",
+            columnDefs: [
+                {
+                    targets: Array.from(hiddenColumns).sort((a, b) => a - b),
+                    visible: false
+                },
+                {
+                    targets: [1,2,3,4,5,6,7,8,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
+                    orderable: false
+                }
+            ]
+        };
+
+        // Destroy existing table if it exists
+        if ($.fn.dataTable.isDataTable("#results-table")) {
+            $("#results-table").DataTable().destroy();
+        }
+
+        // Initialize table with config
+        $("#results-table").DataTable(config);
+
         // Add custom column visibility button
         addColumnVisibilityButton();
-  });
+    });
 }
 
 // Add this new function to create and handle the custom button
@@ -291,6 +314,14 @@ function initializeColumnVisibility() {
         
         checkbox.addEventListener('change', function() {
           col.visible(this.checked);
+          if (this.checked) {
+             if (hiddenColumns.has(colIdx)) 
+                 hiddenColumns.delete(colIdx);
+          } else {
+             if (!hiddenColumns.has(colIdx)) 
+                 hiddenColumns.add(colIdx);
+          }
+          setCookie('VideoBox.hiddenColumns',JSON.stringify(Array.from(hiddenColumns)));
         });
         
         div.appendChild(checkbox);
@@ -370,7 +401,56 @@ function searchPhotos(pattern = "", scope = "/") {
       displayError("An error occurred while fetching data.");
     });
 }
-// =============Display result
+
+function doSemanticSearch(text, scope = "/") {
+  const csrftoken = getCookie("csrftoken");
+  const offset = (currentPage - 1) * maxRows;
+
+  table = $("#results-table").DataTable();
+  table.destroy();
+
+  let pair = {};
+  pair['text'] = text;
+
+  fetch("/api/search-transcript/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrftoken,
+      "Subscription-ID": SUBSCRIPTION_ID,
+      "Client-Secret": CLIENT_SECRET,
+      "Media-Type": "video",
+      "Scope": scope,
+      "Max-Rows": maxRows,
+      "Start-From": offset,
+    },
+    body: JSON.stringify(pair)
+  })
+  .then((response) => response.json())
+  .then((data) => {
+    if (data.error) {
+      displayError(data.error);
+    } else {
+      document.getElementById("desc-header").innerHTML = "Excerpt";
+      recordSet = data.results;
+      displayResults(data.results);
+      updatePagination(data.results);
+      displayThumbnails(data.results,true);
+      if (data.results.length == 0) {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = "No Records Found";
+      } else {
+        const resultsBodyTiles = document.getElementById("bottom-results-label");
+        resultsBodyTiles.innerHTML = `Showing ${offset + 1} to ${offset + recordSet.length} Records`;
+      }
+    }
+  })
+  .catch((error) => {
+    console.log(error);
+    displayError("An error occurred while fetching data.");
+  });
+}
+
 function displayResultsTiles(data, append = false) {
   const resultsBodyTiles = document.getElementById("tiles-results-photo");
   resultsBodyTiles.innerHTML = ""
@@ -381,7 +461,6 @@ function displayResultsTiles(data, append = false) {
   }
 
   if (!Array.isArray(data) || data.length === 0) {
-    console.error("Data is empty or invalid:", data);
     resultsBodyTiles.innerHTML = "No Records Found";
     return;
   }
@@ -501,7 +580,7 @@ function displayResults(results) {
 
   if (results.length === 0) {
     resultsBody.innerHTML =
-      '<tr><td colspan="21">No matching records found.</td></tr>';
+      '<tr><td colspan="1">No matching records found.</td></tr>';
     return;
   }
 
@@ -896,6 +975,7 @@ function selectFolder(folder) {
   updatePlaceholder();
   performSearch();
   applyFilters();
+  setCookie('PhotoBox.currentFolder',currentFolder,7*24*60*60);
 }
 
 function setMaxRows(value) {
@@ -905,6 +985,7 @@ function setMaxRows(value) {
   maxRowsLIs.forEach((li) => {
     if (li.id == "li-" + maxRows.toString()) {
       li.style.listStyleType = "disc";
+      setCookie("PhotoBox.maxRows",value);
     } else {
       li.style.listStyleType = "none";
     }

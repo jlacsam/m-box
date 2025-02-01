@@ -57,6 +57,7 @@ a:visited {
         1px 1px 3px white;
     padding: 0px 30px 0px 30px;
     cursor: default;
+    white-space: nowrap;
 }
 
 #container {
