@@ -49,8 +49,11 @@
     <div class="container">
     <table>
       <tr>
-      <td width=100px class="folder-section">Folder Browser</td>
-      <td width=90%>
+      <td class="folder-section">
+          <button id="btn-new-folder" class="control-button">New Folder</button>
+          <div id="folder-list" class="folder-list"></div>
+      </td>
+      <td class="files-section">
         <div class="search-container">
             <input id="search-box" type="search" class="search" placeholder="[Search assets]">
             <p>&nbsp</p>
@@ -62,7 +65,7 @@
             <table><tr>
                 <td>
                     <span id="results-label">Showing records in</span>
-                    <span id="bread-crumbs" onclick="browseFolder()">[all folders]</span>
+                    <span id="bread-crumbs">[all folders]</span>
                 </td>
                 <td class="paging-buttons">
                     <button id="btn-rename" class="control-button">Rename</button>
@@ -84,7 +87,7 @@
             <table id="results-table">
                 <thead>
                     <tr> <!-- 22 columns -->
-                        <th>File ID</th>
+                        <th><div class="select-cell"><input type="checkbox" id="select-all">ID</div></th>
                         <th>Thumbnail</th>
                         <th>Name</th>
                         <th>File Type</th>

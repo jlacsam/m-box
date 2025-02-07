@@ -496,6 +496,29 @@ function setCookie(name, value, expiration=86400) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
 
+function timeStringToSeconds(timeStr) {
+    // Check if the string matches the expected format
+    const regex = /^(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/;
+    const match = timeStr.match(regex);
+    
+    if (!match) {
+        throw new Error('Invalid time format. Expected HH:MM:SS.NNN');
+    }
+    
+    // Extract components using array destructuring
+    const [_, hours, minutes, seconds, milliseconds] = match;
+    
+    // Convert to numbers and calculate total seconds
+    const totalSeconds = (
+        parseInt(hours) * 3600 +
+        parseInt(minutes) * 60 +
+        parseInt(seconds) +
+        parseInt(milliseconds) / 1000
+    );
+    
+    return totalSeconds;
+}
+
 function timeElapsed(dateString) {
     if (dateString == null) {
         return "N/A";
@@ -558,7 +581,7 @@ function truncateAtWord(str, maxLength = 500, suffix = '...') {
 function vttToHTML(vttString,class_name='cue-text') {
   const lines = vttString.trim().split('\n');
   
-  let tableHTML = '<table id="vtt-table"><tbody>';
+  let tableHTML = '<table id="vtt-table" class="vtt-table"><tbody>';
   let inCue = false;
   let cueStart = '';
   let cueEnd = '';
@@ -575,7 +598,7 @@ function vttToHTML(vttString,class_name='cue-text') {
         const paddedId = cueStart.replace(/[:\.]/g, '').padStart(9, '0');
         const cueEndZP = cueEnd.replace(/[:\.]/g, '').padStart(9, '0');
         tableHTML += `<tr id="${paddedId}" data-cueend="${cueEndZP}">
-          <td><p>${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
+          <td><p id="cue-timestamp-${paddedId}" class="cue-timestamp">${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
           <p id="cue-text-${paddedId}" class="${class_name}"
               data-cuestart="${cueStart}" data-cueend="${cueEnd}">${cueText || '&nbsp;'}</p></td>
         </tr>`;

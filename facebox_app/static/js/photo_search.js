@@ -461,7 +461,7 @@ function displayResultsTiles(data, append = false) {
   }
 
   if (!Array.isArray(data) || data.length === 0) {
-    resultsBodyTiles.innerHTML = "No Records Found";
+    resultsBodyTiles.innerHTML = "No matching records in the current folder.";
     return;
   }
 
@@ -580,7 +580,7 @@ function displayResults(results) {
 
   if (results.length === 0) {
     resultsBody.innerHTML =
-      '<tr><td colspan="1">No matching records found.</td></tr>';
+      '<tr><td colspan="1">No matching records in the current folder.</td></tr>';
     return;
   }
 

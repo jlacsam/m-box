@@ -428,7 +428,7 @@ def move_file(request,file_id,target_folder):
     new_folder = get_object_or_404(MboxFolder, folder_id=target_folder)
 
     # Check if the user has permission to remove the file from the source folder
-    if not check_folder_permission(request,file_id,'delete'):
+    if not check_folder_permission(request,file.folder_id,'delete'):
         return Response({'error':'Permission denied. Write and execute permissions ' \
                         'on the source folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
 

@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.contrib.auth.models import User, Group
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
@@ -22,6 +23,76 @@ from azure.storage.blob import BlobServiceClient
 
 from .utils import get_face_embedding, get_voice_embedding, get_text_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
 from .models import MboxFace, MboxFile, MboxThumbnail, MboxFolder, MboxTranscript
+
+
+# Browse the contents of a folder ###################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def browse_folder(request, folder_id):
+
+    if not check_folder_permission(request,folder_id,'list'):
+        return Response({'error':'Permission denied. Write and execute permissions ' \
+                        'on the parent folder are required.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    max_rows = request.headers.get('Max-Rows')
+    start_from = request.headers.get('Start-From')
+   
+    offset = 0
+    if start_from is not None:
+        offset = start_from
+
+    # Search for matching records in the database
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url', 
+        'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
+        'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
+        'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 
+        'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
+
+    query = """
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+            fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
+            fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, 
+            fl.version, fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights
+        FROM mbox_file fl
+        WHERE fl.folder_id = %s 
+            AND NOT fl.is_deleted 
+        UNION
+        SELECT folder_id, parent_id, name, 'FOLDER', null, size, null,
+            null, date_created, null, description, null, null, null,
+            null, last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
+            owner_rights, group_rights, domain_rights, public_rights, null, remarks,
+            null, null, extra_data, null, null, null, null, null,
+            null, null, null, null, null, null
+        FROM mbox_folder
+        WHERE parent_id = %s
+            AND NOT is_deleted
+        ORDER BY file_id ASC
+        LIMIT %s
+        OFFSET %s
+    """
+
+    rows = []
+    with connection.cursor() as cursor:
+        params = (folder_id, max_rows, offset)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'BROWSE FOLDER','mbox_file',folder_id,None,str(params),get_client_ip(request))
+
+    # Serialize the results and return the response
+    if len(rows):
+        rows = override_file_url(rows, labels)
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
 
 
 # Search the mbox_face table ########################################################################
@@ -834,9 +905,6 @@ def get_folder(request, folder_id):
         cursor.execute(query, (folder_id,))
         rows = cursor.fetchall()
 
-    # Close database connection
-    cursor.close()
-
     # Update the last_accessed field, Insert an audit record for this action 
     if len(rows): 
         insert_audit(request.user.username,'GET FOLDER','mbox_folder',folder_id,None,None,get_client_ip(request))
@@ -849,6 +917,25 @@ def get_folder(request, folder_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
+# Get the folder_id of a given path_name ############################################################
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_folder_id(request):
+    path_name = request.data.get('path_name', '').strip();
+    if not path_name.endswith('/'):
+        path_name += '/'
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT folder_id FROM mbox_folder WHERE path_name = %s", (path_name,))
+        row = cursor.fetchone()
+
+    if row:
+        return Response({'folder_id':row[0]}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error':'No such path_name exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+   
 # Get folders from the mbox_folder table ############################################################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -897,6 +984,58 @@ def get_folders(request, parent_id):
         return Response({'results': []}, status=status.HTTP_200_OK)
 
 
+# Get list of all users ###########################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_users(request):
+    try:
+        users = User.objects.all().order_by('-date_joined')
+        user_list = []
+        
+        for user in users:
+            user_data = {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'date_joined': user.date_joined.isoformat()
+            }
+            user_list.append(user_data)
+            
+        return JsonResponse(user_list, safe=False)
+    except Exception as e:
+        return JsonResponse(
+            {'error': str(e)},
+            status=500
+        )
+
+
+# Get list of all groups ##########################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_all_groups(request):
+    try:
+        groups = Group.objects.all().order_by('-name')
+        group_list = []
+        
+        for group in groups:
+            group_data = {
+                'id': group.id,
+                'name': group.name,
+            }
+            group_list.append(group_data)
+            
+        return JsonResponse(group_list, safe=False)
+    except Exception as e:
+        return JsonResponse(
+            {'error': str(e)},
+            status=500
+        )
+
+
 # Get groups of the specified user ################################################################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -911,6 +1050,9 @@ def get_groups(request):
             groups[i] = 'Editors'
         else:
             groups[i] = group.name.title()
+
+    if request.user.is_superuser:
+        groups.append('Administrators')
 
     return Response({'groups':groups}, status=status.HTTP_200_OK)
 

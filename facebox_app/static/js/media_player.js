@@ -26,8 +26,26 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Video started.");
     });
 
+    videoPlayer.addEventListener('keyup', (event) => {
+        if (event.key = ' ') {
+            if (videoPlayer.paused)
+                videoPlayer.play();
+            else
+                videoPlayer.pause();
+        }
+    });
+
     audioPlayer.addEventListener('play', () => {
         console.log("Audio started.");
+    });
+
+    audioPlayer.addEventListener('keyup', (event) => {
+        if (event.key = ' ') {
+            if (audioPlayer.paused)
+                audioPlayer.play();
+            else
+                audioPlayer.pause();
+        }
     });
 
     videoPlayer.addEventListener('timeupdate', () => {
@@ -135,6 +153,27 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedFileName = q_file_name;
         getMedia(selectedFile);
     }
+
+    editorDiv = document.getElementById('editor-div');
+    document.addEventListener('keyup', (event) => {
+        if (editorDiv.classList.contains('editor-visible'))
+            return;
+
+        if (event.key == ' ') {
+            const playerName = q_file_name == 'video' ? 'video-player' : 'audio-player';
+            const player = document.getElementById(playerName);
+            if (player.paused) 
+                player.play();
+            else
+                player.pause();
+        }
+    });
+
+    editorText = document.getElementById('editor-textarea');
+    editorText.addEventListener('keyup', (event) => {
+        if (event.ctrlKey && event.key == 'Enter') saveEdits();
+        if (event.key == 'Escape') cancelEdits();
+    });
 });
 
 function getGroups() {
@@ -192,7 +231,7 @@ function showEditor(editable,inputtype='textarea',options=[]) {
     }
 
     if (editorDiv.classList.contains('editor-visible'))
-        return;
+        cancelEdits();
 
     editorDiv.classList.remove('editor-hidden');
     editorDiv.classList.add('editor-visible');
@@ -218,6 +257,7 @@ function showEditor(editable,inputtype='textarea',options=[]) {
     // Hide/show the appropriate type of input element
     if (inputtype == 'textarea') {
         editorText.style.display = 'inline';
+        editorText.focus();
         editorSelect.style.display = 'none';
     } else if (inputtype == 'select') {
         editorText.style.display = 'none';
@@ -235,6 +275,7 @@ function showEditor(editable,inputtype='textarea',options=[]) {
         if (initialVal && options.includes(initialVal)) {
             editorSelect.value = initialVal;
         }
+        editorSelect.focus();
     }
 }
 
@@ -661,6 +702,23 @@ function showTranscript(file_id) {
         Array.from(editables).forEach(editable => {
             editable.addEventListener('dblclick', () => showEditor(editable))
         });
+
+        const timeRanges = document.getElementsByClassName('cue-timestamp');
+        Array.from(timeRanges).forEach(timeRange => {
+            timeRange.addEventListener('dblclick', () => {
+                const timeStart = timeStringToSeconds(timeRange.innerHTML.substring(0,12));
+                const playerName = (q_file_name == 'video') ? 'video-player' : 'audio-player';
+                const player = document.getElementById(playerName);
+                player.currentTime = timeStart;
+                player.play();
+            });
+        });
+
+        transcript.addEventListener('keydown', (event) => {
+           if (event.key == ' ' && event.target.tagName != 'INPUT' && event.target.tagName != 'TEXTAREA') {
+                event.preventDefault();
+           }
+        });
     })
     .catch(error => {
         const transcript = document.getElementById('transcript');
@@ -722,12 +780,15 @@ function toggleAudit() {
 
     const auditLog = document.getElementById('audit-log');
     const menuItem = document.getElementById('menu-audit');
+    const downloadBtn = document.getElementById('download-transcript');
     if (auditLog.classList.contains('audit-hidden')) {
+        downloadBtn.style.display = 'none';
         auditLog.classList.remove('audit-hidden');
         auditLog.classList.add('audit-visible');
         menuItem.innerHTML = 'Hide audit'
         getAudit(selectedFile);
     } else {
+        downloadBtn.style.display = 'block';
         auditLog.classList.remove('audit-visible');
         auditLog.classList.add('audit-hidden');
         menuItem.innerHTML = 'Show audit'
