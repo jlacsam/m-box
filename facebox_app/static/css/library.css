@@ -55,6 +55,7 @@ a:visited {
 }
 
 .files-section {
+  vertical-align: top;
   width: 88%;
 }
 
@@ -1022,7 +1023,7 @@ tr.highlighted {
     gap: 10px;
 }
 
-.file-list {
+.item-list {
     max-height: 300px;
     overflow-y: auto;
     background-color: #f5f5f5;
@@ -1032,7 +1033,7 @@ tr.highlighted {
     column-gap: 20px;
 }
 
-.file-list-item {
+.item-list-item {
     padding: 2px 0;
     font-size: 0.8em;
 }

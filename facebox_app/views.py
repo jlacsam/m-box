@@ -21,7 +21,7 @@ from django.contrib.auth.decorators import login_required
 
 from azure.storage.blob import BlobServiceClient
 
-from .utils import get_face_embedding, get_voice_embedding, get_text_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
+from .utils import get_face_embedding, get_voice_embedding, get_text_embedding, validate_subscription, tuples_to_json, get_client_ip, check_file_permission, check_folder_permission, insert_audit, update_last_accessed, validate_subscription_headers, override_file_url
 from .models import MboxFace, MboxFile, MboxThumbnail, MboxFolder, MboxTranscript
 
 
@@ -43,7 +43,7 @@ def browse_folder(request, folder_id):
         offset = start_from
 
     # Search for matching records in the database
-    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url', 
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_type', 'media_source', 'size', 'file_url', 
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 
@@ -51,7 +51,7 @@ def browse_folder(request, folder_id):
         'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
 
     query = """
-        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, fl.size, fl.file_url, 
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, 
@@ -61,7 +61,7 @@ def browse_folder(request, folder_id):
         WHERE fl.folder_id = %s 
             AND NOT fl.is_deleted 
         UNION
-        SELECT folder_id, parent_id, name, 'FOLDER', null, size, null,
+        SELECT folder_id, parent_id, name, 'FOLDER', 'FOLDER', null, size, null,
             null, date_created, null, description, null, null, null,
             null, last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
             owner_rights, group_rights, domain_rights, public_rights, null, remarks,
@@ -77,7 +77,7 @@ def browse_folder(request, folder_id):
 
     rows = []
     with connection.cursor() as cursor:
-        params = (folder_id, max_rows, offset)
+        params = (folder_id, folder_id, max_rows, offset)
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
@@ -588,7 +588,7 @@ def search_media(request):
         pattern = "'" + pattern[1:-1] + "'"
 
     # Search for matching records in the database
-    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_source', 'size', 'file_url', 
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_type', 'media_source', 'size', 'file_url', 
         'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 'version', 
@@ -597,7 +597,7 @@ def search_media(request):
 
     if len(pattern) > 0:
         query = """
-        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, fl.size, fl.file_url, 
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
@@ -616,7 +616,7 @@ def search_media(request):
         """.format(placeholders)
     else:
         query = """
-        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_source, fl.size, fl.file_url, 
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, fl.size, fl.file_url, 
             fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, fl.tags, fl.people, fl.places, 
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, fl.version, 
