@@ -47,7 +47,7 @@
                         <td class="paging-buttons">
                             <button id="first-media" class="paging-button" onclick="getFirstMedia()">&#x21E4</button>
                             <button id="prev-media" class="paging-button" onclick="getAdjacentMedia('backward')">&#x21A4</button></td>
-                        <td><div id="media-container">
+                        <td class="media-container-td"><div id="media-container">
                             <video id="video-player" controls></video>
                             <audio id="audio-player" controls></audio>
                         </div></td>
@@ -57,7 +57,7 @@
                     </tr>
                 </table>
                 <table id="details-table">
-                    <tr><td class="video-filler">&nbsp;</td></tr>
+                    <tr><td id="filler-row">&nbsp;</td></tr>
                     <tr>
                         <td colspan=6><div class="detail_label">Title</div>
                             <div id="detail-title" class="detail_value detail_editable"></div></td>

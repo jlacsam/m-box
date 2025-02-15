@@ -329,8 +329,8 @@ def search_voice(request):
 ####################################################################################################
 # Search the mbox_voice table using a reference to a segment from another audio file that is already 
 # stored in the mbox_table and has records in the mbox_voice table
-@permission_classes([IsAuthenticated])
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def search_voice_by_ref(request,voice_id):
     # Extract and validate subscription ID and client secret
     subscription_id = request.headers.get('Subscription-ID')
@@ -771,7 +771,7 @@ def get_recycle_bin(request):
 def get_media(request, file_id):
    
     # Search for matching records in the database
-    labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 
+    labels = ['file_id','folder_id','file_name','folder_name','extension','media_type','media_source','size', 
         'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 
         'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
         'group_name', 'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
@@ -779,7 +779,7 @@ def get_media(request, file_id):
         'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
     rows = []
     query = """
-        SELECT f1.file_id, f1.folder_id, f1.name, f2.path_name, f1.extension, f1.media_source, f1.size, 
+        SELECT f1.file_id,f1.folder_id,f1.name,f2.path_name,f1.extension,f1.media_type,f1.media_source,f1.size, 
             f1.file_url, f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, 
             f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
             f1.group_name, f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
@@ -885,14 +885,14 @@ def get_adjacent_media(request, file_id):
 def get_folder(request, folder_id):
    
     # Search for matching records in the database
-    labels = ['folder_id', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
+    labels = ['folder_id', 'path_name', 'name', 'path', 'size', 'date_created', 'folder_level', 'description',
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name',
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'subfolder_count', 'file_count', 
         'video_count', 'audio_count', 'photo_count', 'reviewed_count', 'page_count', 'stats_as_of',
         'parent_id', 'remarks', 'schema_id', 'extra_data'];
     rows = []
     query = """
-        SELECT folder_id, name, path, size, date_created, folder_level, description,
+        SELECT folder_id, path_name, name, path, size, date_created, folder_level, description,
             last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
             owner_rights, group_rights, domain_rights, public_rights, subfolder_count, file_count, 
             video_count, audio_count, photo_count, reviewed_count, page_count, stats_as_of,
@@ -1422,6 +1422,13 @@ def library_viewer(request):
         'is_supervisor': is_supervisor,
     }
     return render(request, 'library.html', context)
+
+@login_required
+def uploader(request):
+    context = {
+        'folder_id':request.GET.get('folder_id','1')
+    }
+    return render(request, 'uploader.html', context)
 
 @login_required
 def api_tester(request):

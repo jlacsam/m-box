@@ -567,6 +567,10 @@ function timeToStr(seconds) {
   return `${paddedHours}:${paddedMinutes}:${paddedSeconds}.${paddedMilliseconds}`;
 }
 
+function toTitleCase(str) {
+    return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+}
+
 function trimWhitespaces(str) {
     return str.replace(/\s+/g, ' ');
 }

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>m-box File Upload</title>
+        {% load static %}
+        <link rel="stylesheet" href="{% static 'css/uploader.css' %}">
+        <link rel="icon" href="{% static 'favicon.ico' %}">
+    </head>
+    <body>
+        {% csrf_token %}
+    <div id="header" class="header">
+        <span class="logo">m-box</span>
+        <span class="title-bar"><table id="title-bar"><tr>
+            <td><table id="menu-bar"><tr>
+                <td id="videos-tab" onclick="goToVideos()">Videos</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
+                <td id="photos-tab" onclick="goToPhotos()">Photos</td>
+                <td id="faces-tab" onclick="goToFaces()">Faces</td>
+                <td id="voices-tab" onclick="goToVoices()">Voices</td>
+                <td id="menu-separator">&nbsp;</td>
+                <td id="library-tab" onclick="goToLibrary()">Library</td>
+                <td id="reports-tab" onclick="goToReports()">Reports</td>
+                </tr></table></td>
+            <td id="filler-space"></td>
+            <td><table id="tool-bar"><tr>
+                <td id="username">Hi {{ user.username }}!</td>
+                <td id="profile">&#x1F466</td>
+                <td id="settings">&#x2699</td></tr></table></td>
+            </tr>
+            </table>
+        </span>
+    </div>
+    <div id="popup-menu" class="popup-hidden">
+        <div id="user-groups">Editing allowed</div>
+        <div><hr></div>
+        <div class="menu-item"><a href="/logout/">Sign out</a></div>
+    </div>
+
+        <div id="uploadModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Upload Files to&nbsp;<span id="targetPath" class="target-path"></span></h2>
+                    <span class="close">&times;</span>
+                </div>
+
+                <div id="uploadMessage" style="display: none;" class="status-message">
+                    Please do not refresh the page while upload is in progress
+                </div>
+
+                <div id="dropZone" class="drop-zone">
+                    <p>Drag and drop files here or click to select files.</p>
+                </div>
+
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="totalProgress" class="progress"></div>
+                    </div>
+                </div>
+
+                <div id="fileList" class="file-list"></div>
+                <div class="modal-options">
+                    <h2>AI Processing Options</h2>
+                </div>
+                <div id="uploadOptions" class="upload-options">
+                </div>
+
+                <div id="errorMessages" class="error-messages"></div>
+
+                <div class="modal-footer">
+                    <button id="uploadButton" class="upload-btn">Upload Files</button>
+                </div>
+            </div>
+        </div>
+        <script>
+            const target_folder_id = '{{ folder_id }}'; 
+        </script>
+        <script src="{% static 'js/utils.js' %}"></script>
+        <script src="{% static 'js/uploader.js' %}"></script>
+    </body>
+</html>

@@ -149,6 +149,7 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
 # In a Docker environment, this environment variables will NOT be defined
 # because it is already defined in the YAML file

@@ -761,6 +761,50 @@
       "status"     : "BETA"
     },
     {
+      "name"       : "Set Tree Group",
+      "description": "Updates the group for which the specified folder tree.",
+      "endpoint"   : "set-tree-group/<int:folder_id>/<str:group_name>/",
+      "method"     : "PATCH",
+      "headers"    : [ { "Content-Type" : "application/json" }, 
+                       { "Subscription-ID" : "00000000" },
+                       { "Client-Secret" : "00000000" } ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" }, { "name" : "Group Name", "type" : "str" }],
+      "body"       : null,
+      "outputs"    : [ { "result" : "success" }, { "error" : "Error description" } ],
+      "status"     : "BETA"
+    },
+    {
+      "name"       : "Set Tree Owner",
+      "description": "Updates the owner of the specified folder tree.",
+      "endpoint"   : "set-tree-owner/<int:folder_id>/<str:owner_name>/",
+      "method"     : "PATCH",
+      "headers"    : [ { "Content-Type" : "application/json" }, 
+                       { "Subscription-ID" : "00000000" },
+                       { "Client-Secret" : "00000000" } ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" }, { "name" : "Owner Name", "type" : "str" } ],
+      "body"       : null,
+      "outputs"    : [ { "result" : "success" }, { "error" : "Error description" } ],
+      "status"     : "BETA"
+    },
+    {
+      "name"       : "Set Tree Permissions",
+      "description": "Sets the owner, group, domain and public permissions of the specified folder tree.",
+      "endpoint"   : "set-tree-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/",
+      "method"     : "PATCH",
+      "headers"    : [ { "Content-Type" : "application/json" }, 
+                       { "Subscription-ID" : "00000000" },
+                       { "Client-Secret" : "00000000" } ],
+      "parameters" : [ { "name" : "Folder ID", "type" : "int" }, 
+                       { "name" : "Owner Rights", "type" : "int" },
+                       { "name" : "Group Rights", "type" : "int" },
+                       { "name" : "Domain Rights", "type" : "int" },
+                       { "name" : "Public Rights", "type" : "int" }
+                     ],
+      "body"       : null,
+      "outputs"    : [ { "result" : "success" }, { "error" : "Error description" } ],
+      "status"     : "BETA"
+    },
+    {
       "name"       : "Unlink Faces",
       "description": "Unlinks two or more faces from the person specified by the person_id.",
       "endpoint"   : "unlink-faces/<int:person_id>/",

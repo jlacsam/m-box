@@ -1,4 +1,5 @@
 import os
+import json
 import boto3
 
 from django.conf import settings
@@ -294,6 +295,135 @@ def set_folder_permission(request,folder_id,owner_rights,group_rights,domain_rig
     # Insert audit record, update last_modified
     insert_audit(request.user.username,'SET PERMISSION','mbox_folder',folder_id,
                  old_permissions,new_permissions,get_client_ip(request))
+    update_last_modified(folder_id,'folder')
+
+    return Response({'result':'success'}, status=status.HTTP_200_OK)
+
+
+# Set group for an entire directory tree ###########################################################
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def set_tree_group(request,folder_id,group_name):
+
+    if not check_folder_permission(request,folder_id,'set_tree_group'):
+        return Response({'error':'Permission denied. Only the administrator ' \
+                        'can change the group of a folder tree.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
+    pattern = folder.path + '%'
+    new_group = Group.objects.get(name=group_name)
+
+    query = """
+        UPDATE mbox_folder
+        SET group_id = %s, group_name = %s
+        WHERE path LIKE %s
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (new_group.id, group_name, pattern))
+        affected = cursor.rowcount
+
+    query = """
+        UPDATE mbox_file
+        SET group_id = %s, group_name = %s
+        WHERE folder_id IN (
+            SELECT folder_id FROM mbox_folder WHERE path LIKE %s
+        )
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (new_group.id, group_name, pattern))
+        affected += cursor.rowcount
+
+    # Insert audit record, update last_modified
+    insert_audit(request.user.username,'SET TREE GROUP','mbox_folder',folder_id,
+                 folder.group_name,group_name,get_client_ip(request))
+    update_last_modified(folder_id,'folder')
+
+    return Response({'result':'success'}, status=status.HTTP_200_OK)
+
+
+# Set owner for an entire directory tree ###########################################################
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def set_tree_owner(request,folder_id,owner_name):
+
+    if not check_folder_permission(request,folder_id,'set_tree_owner'):
+        return Response({'error':'Permission denied. Only the administrator ' \
+                        'can change the owner of a folder tree.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
+    pattern = folder.path + '%'
+    new_owner = User.objects.get(username=owner_name)
+
+    query = """
+        UPDATE mbox_folder
+        SET owner_id = %s, owner_name = %s
+        WHERE path LIKE %s
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (new_owner.id, owner_name, pattern))
+        affected = cursor.rowcount
+
+    query = """
+        UPDATE mbox_file
+        SET owner_id = %s, owner_name = %s
+        WHERE folder_id IN (
+            SELECT folder_id FROM mbox_folder WHERE path LIKE %s
+        )
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (new_owner.id, owner_name, pattern))
+        affected += cursor.rowcount
+
+    # Insert audit record, update last_modified
+    insert_audit(request.user.username,'SET TREE OWNER','mbox_folder',folder_id,
+                 folder.owner_name,owner_name,get_client_ip(request))
+    update_last_modified(folder_id,'folder')
+
+    return Response({'result':'success'}, status=status.HTTP_200_OK)
+
+
+# Set permission for an entire directory tree ######################################################
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def set_tree_permission(request,folder_id,owner_rights,group_rights,domain_rights,public_rights):
+
+    if not check_folder_permission(request,folder_id,'set_tree_permission'):
+        return Response({'error':'Permission denied. Only the administrator ' \
+                        'can change the permissions of a folder tree.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if owner_rights > 7 or group_rights > 7 or domain_rights > 7 or public_rights > 7:
+        return Response({'error':'Invalid value(s)'}, status=status.HTTP_400_BAD_REQUEST)
+
+    folder = get_object_or_404(MboxFolder, folder_id=folder_id)
+    pattern = folder.path + '%'
+
+    query = """
+        UPDATE mbox_folder
+        SET owner_rights = %s, group_rights = %s, domain_rights = %s, public_rights = %s
+        WHERE path LIKE %s
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (owner_rights, group_rights, domain_rights, public_rights, pattern))
+        affected = cursor.rowcount
+
+    query = """
+        UPDATE mbox_file
+        SET owner_rights = %s, group_rights = %s, domain_rights = %s, public_rights = %s
+        WHERE folder_id IN (
+            SELECT folder_id FROM mbox_folder WHERE path LIKE %s
+        )
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query, (owner_rights, group_rights, domain_rights, public_rights, pattern))
+        affected += cursor.rowcount
+
+    # Insert audit record, update last_modified
+    new_permissions = f"{owner_rights}|{group_rights}|{domain_rights}|{public_rights}"
+    insert_audit(request.user.username,'SET TREE PERMISSION','mbox_folder',folder_id,
+                 None,new_permissions,get_client_ip(request))
     update_last_modified(folder_id,'folder')
 
     return Response({'result':'success'}, status=status.HTTP_200_OK)
@@ -749,6 +879,8 @@ def upload_file(request,folder_id):
         return Response({'error':'File too large. Maximum file size is 4GB.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
+    metadata = json.loads(request.data.get('metadata', '{}'))
+
     video_exts = ['.mov','.mp4','.avi','.webm','.ogg','.mkv','.wmv','.flv']
     audio_exts = ['.aac','.aiff','.flac','.m4a','.mp3','.raw','.vox','.wav','.wma']
     image_exts = ['.bmp','.jpeg','.jpg','.png','.gif','.jp2','.ico','.tif','.tiff','.svg']
@@ -766,7 +898,7 @@ def upload_file(request,folder_id):
     elif ext in audio_exts:
         media_type = 'audio'
     elif ext in image_exts:
-        media_type = 'image'
+        media_type = 'photo'
     elif ext in doc_exts:
         media_type = 'document'
 
@@ -787,6 +919,7 @@ def upload_file(request,folder_id):
             name=uploaded_file.name,
             extension=ext[1:],
             media_type=media_type,
+            media_source=media_type,
             size=uploaded_file.size,
             owner_id=request.user.id,
             owner_name=request.user.username,

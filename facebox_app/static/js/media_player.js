@@ -610,14 +610,17 @@ function getFilePosition(file_id,folder_id) {
 }
 
 function showMedia(data) {
+    const fillerRow = document.getElementById('filler-row');
     if (q_file_name == 'video') {
         const videoPlayer = document.getElementById('video-player');
         videoPlayer.src = data.file_url;
         videoPlayer.load();
+        fillerRow.classList.add('video-filler');
     } else if (q_file_name == 'audio') {
         const audioPlayer = document.getElementById('audio-player');
         audioPlayer.src = data.file_url;
         audioPlayer.load();
+        fillerRow.classList.add('audio-filler');
     }
 }
 
@@ -1032,36 +1035,27 @@ function selectFolder(folder) {
 
 function convertTableToText() {
     const table = document.getElementById('vtt-table');
-    console.log('Table element:', table); // Check if table is found
 
     let textContent = '';
 
     // Get all rows except header
     const rows = table.querySelectorAll('tr');
-    console.log('Number of rows found:', rows.length); // Check number of rows
-    
     const dataRows = Array.from(rows).slice(1); // Skip header row
-    console.log('Number of data rows:', dataRows.length); // Check number of data rows
     
     dataRows.forEach((row, index) => {
-        console.log(`Processing row ${index + 1}`); // Track row processing
         
         const cells = row.querySelectorAll('td');
-        console.log(`Number of cells in row ${index + 1}:`, cells.length, cells);
         
         // Get the cell containing p tags (third column)
         const cell = cells[0];
-        console.log(`Cell content for row ${index + 1}:`, cell?.innerHTML);
         
         if (cell) {
             // Get all p tags within the cell
             const paragraphs = cell.querySelectorAll('p');
-            console.log(`Number of paragraphs in row ${index + 1}:`, paragraphs.length);
             
             // Extract text from each p tag
             paragraphs.forEach((p, pIndex) => {
                 const text = p.textContent.trim();
-                console.log(`Paragraph ${pIndex + 1} text:`, text);
                 
                 if (text && text !== 'undefined') {
                     textContent += `${text}\n`;
@@ -1070,7 +1064,6 @@ function convertTableToText() {
         }
     });
 
-    console.log('Final text content:', textContent); // Check final output
     return textContent;
 }
 

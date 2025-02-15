@@ -19,6 +19,7 @@ urlpatterns = [
     path('photo-viewer/', views.photo_viewer, name='photo_viewer'),
     path('library/', views.library_viewer, name='library_viewer'),
     path('reports/', views.reports_viewer, name='reports_viewer'),
+    path('uploader/', views.uploader, name='uploader'),
     path('api-tester/', views.api_tester, name='api_tester'),
     # APIs that retrieve data
     path('browse-folder/<int:folder_id>/', views.browse_folder, name='browse_folder'),
@@ -69,6 +70,9 @@ urlpatterns = [
     path('set-folder-group/<int:folder_id>/<str:group_name>/', apis.set_folder_group, name='set_folder_group'),
     path('set-folder-owner/<int:folder_id>/<str:owner_name>/', apis.set_folder_owner, name='set_folder_owner'),
     path('set-folder-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/', apis.set_folder_permission, name='set_folder_permission'),
+    path('set-tree-group/<int:folder_id>/<str:group_name>/', apis.set_tree_group, name='set_tree_group'),
+    path('set-tree-owner/<int:folder_id>/<str:owner_name>/', apis.set_tree_owner, name='set_tree_owner'),
+    path('set-tree-permission/<int:folder_id>/<int:owner_rights>/<int:group_rights>/<int:domain_rights>/<int:public_rights>/', apis.set_tree_permission, name='set_tree_permission'),
     path('unlink-faces/<int:person_id>/', apis.unlink_faces, name='unlink_faces'),
     path('update-file/<int:file_id>/', apis.update_file, name='update_file'),
     path('update-folder/<int:folder_id>/', apis.update_folder, name='update_folder'),

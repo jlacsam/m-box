@@ -39,25 +39,25 @@
     </div>
     <div id="settings-menu" class="popup-hidden">
         <ul id="max-rows-options">
-            <li id="li-10" onclick="setMaxRows(10)">Max rows: 10</li> 
-            <li id="li-25" onclick="setMaxRows(25)">Max rows: 25</li> 
-            <li id="li-50" onclick="setMaxRows(50)">Max rows: 50</li> 
-            <li id="li-100" onclick="setMaxRows(100)">Max rows: 100</li> 
+            <li id="li-10" onclick="setMaxRows(100)">Max rows: 100</li> 
+            <li id="li-25" onclick="setMaxRows(250)">Max rows: 250</li> 
+            <li id="li-50" onclick="setMaxRows(500)">Max rows: 500</li> 
+            <li id="li-100" onclick="setMaxRows(1000)">Max rows: 1000</li> 
         </ul>
     </div>
 
     <div class="container">
-    <table>
+    <table class="library-body">
       <tr>
       <td class="folder-section">
-          <button id="btn-new-folder" class="control-button">New Folder</button>
+          <button id="btn-new-folder" class="control-button" onclick="createFolder()">New Folder</button>
           <div id="folder-list" class="folder-list"></div>
       </td>
       <td class="files-section">
         <div class="search-container">
             <input id="search-box" type="search" class="search" placeholder="[Search assets]">
             <p>&nbsp</p>
-            <button id="search-button" class="button">Search</button>
+            <button id="search-button" class="button">&#128269;Search</button>
             <button id="reset-button" class="button">Reset</button>
         </div>
     
@@ -67,15 +67,15 @@
                     <span id="results-label">Showing records in</span>
                     <span id="bread-crumbs">[all folders]</span>
                 </td>
-                <td class="paging-buttons">
-                    <button id="btn-rename" class="control-button">Rename</button>
-                    <button id="btn-move" class="control-button">Move</button>
-                    <button id="btn-set-owner" class="control-button">Set Owner</button>
-                    <button id="btn-set-group" class="control-button">Set Group</button>
-                    <button id="btn-set-access" class="control-button">Set Access</button>
-                    <button id="top-page" class="paging-button">&#x21E4</button>
-                    <button id="prev-page" class="paging-button">&#x21A4</button>
-                    <button id="next-page" class="paging-button">&#x21A6</button>
+                <td class="control-buttons">
+                    <div id="context-buttons" class="context-buttons">
+                        <button id="btn-rename" class="control-button">Rename</button>
+                        <button id="btn-move" class="control-button">Move</button>
+                        <button id="btn-set-owner" class="control-button">Set Owner</button>
+                        <button id="btn-set-group" class="control-button">Set Group</button>
+                        <button id="btn-set-access" class="control-button">Set Access</button>
+                    </div>
+                    <button id="column-filter-button"></button>
                     <label class="switch">
                         <input type="checkbox" id="toggleViewBtn">
                         <span class="slider-tile"></span>
@@ -115,22 +115,14 @@
         </div>
         <div id="tiles-results" style="display: none;"></div>
 
-        <div class="controls">
-            <table><tr>
-                <td id="bottom-results-label">
-                    Showing all records
-                </td>
-                <td class="paging-buttons">
-                    <button id="bottom-top-page" class="paging-button">&#x21E4</button>
-                    <button id="bottom-prev-page" class="paging-button">&#x21A4</button>
-                    <button id="bottom-next-page" class="paging-button">&#x21A6</button>
-                </td>
-            </tr></table>
-        </div>
       </td></tr></table>
     </div>
 
     <div id="folder-browser" class='folder-browser-hidden'>
+    </div>
+
+    <div class="upload-button-div">
+        <button id="upload-button" class="upload-button">&#xFF0B</button>
     </div>
 
     <script>

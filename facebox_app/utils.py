@@ -215,6 +215,10 @@ def check_folder_permission(request,folder_id,action):
         if user.is_superuser:
             return True
 
+    if action in [ 'set_tree_owner', 'set_tree_group', 'set_tree_permission']:
+        if user.is_superuser:
+            return True
+
     return False
 
 # Check File Permissions #####################################################

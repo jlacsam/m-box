@@ -5,12 +5,15 @@ const FILE_ICON = "\u{1F5CE}";
 const AUDIO_ICON = "\u{1F5AD}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
+const DEFAULT_HIDDEN_COLUMNS = [6, 8, 9, 14, 16, 17, 18];
 
 let currentPage = 1;
 let totalPages = 1;
 let recordSet = null;
 let currentFolder = "/";
+let currentFolderID = 1;
 let maxRows = 25;
+let hiddenColumns = new Set(DEFAULT_HIDDEN_COLUMNS);
 
 $.fn.dataTable.ext.errMode = 'none';
 
@@ -36,24 +39,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const setAccessButton = document.getElementById("btn-set-access");
     setAccessButton.addEventListener("click", () => setItemAccess());
-
-    const topPageButton = document.getElementById("top-page");
-    topPageButton.addEventListener("click", () => goToPage("top"));
-
-    const prevPageButton = document.getElementById("prev-page");
-    prevPageButton.addEventListener("click", () => goToPage("prev"));
-
-    const nextPageButton = document.getElementById("next-page");
-    nextPageButton.addEventListener("click", () => goToPage("next"));
-
-    const bottomTopPageButton = document.getElementById("bottom-top-page");
-    bottomTopPageButton.addEventListener("click", () => goToPage("top"));
-
-    const bottomPrevPageButton = document.getElementById("bottom-prev-page");
-    bottomPrevPageButton.addEventListener("click", () => goToPage("prev"));
-
-    const bottomNextPageButton = document.getElementById("bottom-next-page");
-    bottomNextPageButton.addEventListener("click", () => goToPage("next"));
 
     const searchBox = document.getElementById("search-box");
     searchBox.addEventListener("keyup", function (event) {
@@ -124,15 +109,55 @@ document.addEventListener("DOMContentLoaded", function () {
             checkbox.checked = selectAll.checked;
         });
         e.stopPropagation();
+        toggleContextButtons();
     });
 
+    const uploadButton = document.getElementById('upload-button');
+    uploadButton.onclick = () => {
+        window.open(
+            "/app/uploader/?folder_id=" + currentFolderID,
+            "_blank"
+        );
+    }
+
+    // Get initial folder
+    savedFolder = getCookie('Library.currentFolder');
+    savedFolderID = getCookie('Library.currentFolderID');
+    if (savedFolder != null) currentFolder = savedFolder;
+    if (savedFolderID != null) currentFolderID = savedFolderID;
+    const breadCrumbs = document.getElementById("bread-crumbs");
+    breadCrumbs.innerHTML = currentFolder == '/' ? '[all folders]' : currentFolder;
+    updatePlaceholder();
+
+    // Get initial hidden columns
+    savedHiddenColumns = getCookie('Library.hiddenColumns');
+    if (savedHiddenColumns) hiddenColumns = new Set(JSON.parse(savedHiddenColumns));
+
+    // Get initial max rows
+    savedMaxRows = getCookie('Library.maxRows');
+    if (savedMaxRows) maxRows = parseInt(savedMaxRows);
     setMaxRows(maxRows);
+
     getGroups();
 
     // Initial load
     getFolders(1,'folder-list',false,false);
-    browseFolder();
+    browseFolder(currentFolderID);
+    toggleContextButtons();
 });
+
+function toggleContextButtons() {
+    const contextButtons = document.getElementById('context-buttons');
+    const query = 'input[type="checkbox"][id^="cb_"]';
+
+    let hasSelected = false;
+    Array.from(document.querySelectorAll(query)).forEach(checkbox => {
+        if (checkbox.checked) {
+            hasSelected = true;
+        }
+    });
+    contextButtons.style.display = hasSelected ? 'block' : 'none';
+}
 
 function getGroups() {
     const csrftoken = getCookie("csrftoken");
@@ -184,11 +209,11 @@ console.log('hello "world"',isValidTsQueryString('hello "world"')); // false
     let value = searchBox.value.trim();
     currentPage = 1;
     if (value.length == 0 || isValidTsQueryString(value)) {
-        searchVideos(value, currentFolder);
+        searchMedia(value, currentFolder);
     } else if (isUnquoted(value) && containsSpace(value)) {
         // make the search string a valid TsQuery. Assume OR.
         value = trimWhitespaces(value).replaceAll(" ", " | ");
-        searchVideos(value, currentFolder);
+        searchMedia(value, currentFolder);
     } else {
         alert("Invalid search string.");
     }
@@ -208,7 +233,7 @@ function resetPage() {
     searchBox.value = "";
     updatePlaceholder();
     currentPage = 1;
-    searchVideos("", currentFolder);
+    searchMedia("", currentFolder);
 }
 
 function applyFilters() {
@@ -221,11 +246,11 @@ function applyFilters() {
             order: [[0, "asc"]],
             columnDefs: [
                 {
-                    targets: [6, 8, 9, 14, 16, 17, 18],
+                    targets: Array.from(hiddenColumns).sort((a, b) => a - b),
                     visible: false,
                 },
                 {
-                    targets: [2, 13, 15, 16, 17],
+                    targets: [1, 12, 13, 15, 16],
                     orderable: false
                 }
             ]
@@ -245,38 +270,14 @@ function applyFilters() {
 
 // Add this new function to create and handle the custom button
 function addColumnVisibilityButton() {
-    // Select the td elements with class 'paging-buttons'
-    const topPagingButtons = document.querySelector('.controls table tr td.paging-buttons');
-
-    if (!topPagingButtons) {
-        console.error('Could not find paging buttons containers');
-        return;
-    }
 
     // Create buttons for top and bottom controls
-    const topButton = createColumnButton();
-
-    // Insert buttons before the toggle view button in top controls
-    const toggleBtn = document.querySelector('#toggleViewBtn');
-    if (toggleBtn && toggleBtn.parentElement) {
-        toggleBtn.parentElement.parentElement.insertBefore(topButton, toggleBtn.parentElement);
-    } else {
-        topPagingButtons.insertBefore(topButton, topPagingButtons.firstChild);
-    }
+    const topButton = document.getElementById('column-filter-button');
+    topButton.className = 'filter-button column-visibility-btn';
+    topButton.textContent = COLUMN_FILTER_ICON;
 
     // Initialize the column visibility functionality
     initializeColumnVisibility();
-}
-
-function createColumnButton() {
-    let button = document.getElementById('column-filter-button');
-    if (button == null) {
-        button = document.createElement('button');
-        button.id = 'column-filter-button';
-        button.className = 'filter-button column-visibility-btn';
-        button.textContent = COLUMN_FILTER_ICON;
-    }
-    return button;
 }
 
 function initializeColumnVisibility() {
@@ -306,7 +307,15 @@ function initializeColumnVisibility() {
                 checkbox.checked = col.visible();
 
                 checkbox.addEventListener('change', function() {
-                    col.visible(this.checked);
+                  col.visible(this.checked);
+                  if (this.checked) {
+                      if (hiddenColumns.has(colIdx))
+                          hiddenColumns.delete(colIdx);
+                  } else {
+                      if (!hiddenColumns.has(colIdx))
+                          hiddenColumns.add(colIdx);
+                  }
+                  setCookie('Library.hiddenColumns',JSON.stringify(Array.from(hiddenColumns)));
                 });
 
                 div.appendChild(checkbox);
@@ -363,7 +372,7 @@ function browseFolder(folder_id=1) {
             } else {
                 recordSet = data.results;
                 displayResults(data.results);
-                updatePagination(data.results);
+                displayResultsTiles(data.results);
                 displayThumbnails(data.results);
             }
         })
@@ -373,12 +382,12 @@ function browseFolder(folder_id=1) {
         });
 }
 
-function searchVideos(pattern = "", scope = "/") {
+function searchMedia(pattern = "", scope = "/") {
     const csrftoken = getCookie("csrftoken");
     const offset = (currentPage - 1) * maxRows;
     table = $("#results-table").DataTable();
     table.destroy();
-    fetch("/api/search-video/", {
+    fetch("/api/search-media/", {
         method: "GET",
         headers: {
             "Subscription-ID": SUBSCRIPTION_ID,
@@ -387,7 +396,7 @@ function searchVideos(pattern = "", scope = "/") {
             "Start-From": offset,
             Pattern: pattern,
             Scope: scope,
-            "Media-Type": "video",
+            "Media-Type": "video,audio,photo,document",
             "X-CSRFToken": csrftoken,
         },
     })
@@ -398,8 +407,8 @@ function searchVideos(pattern = "", scope = "/") {
             } else {
                 recordSet = data.results;
                 displayResults(data.results);
+                displayResultsTiles(data.results);
                 highlightWords(dequote(pattern));
-                updatePagination(data.results);
                 displayThumbnails(data.results);
             }
         })
@@ -429,6 +438,7 @@ function closeVideoPopup() {
         popup.remove();
     }
 }
+
 function displayResultsTiles(data, append = false) {
     const resultsBodyTiles = document.getElementById("tiles-results");
     if (!resultsBodyTiles) {
@@ -438,7 +448,6 @@ function displayResultsTiles(data, append = false) {
     }
 
     if (!Array.isArray(data) || data.length === 0) {
-        console.error("Data is empty or invalid:", data);
         resultsBodyTiles.innerHTML = "No Records Found";
         return;
     }
@@ -446,97 +455,43 @@ function displayResultsTiles(data, append = false) {
     let html = "";
 
     data.forEach((item) => {
-        if (item.attributes) {
-            attributes = JSON.parse(item.attributes);
-        } else {
-            attributes = {
-                "length":0,
-                "frame_rate":0,
-                "audio_channels":0,
-                "video_resolution":"0x0",
-                "audio_sample_rate":0
-            };
-        }
-        videoLength = Math.abs((attributes["length"]));
-        const formattedTime = timeToStr(videoLength);
-        attributes.length = formattedTime;
-        attributes_new = JSON.stringify(attributes)
-            .replaceAll("\\", "")
-            .replaceAll('"', "")
-            .replaceAll(",", ", ");
         html += `
-      <div class="tile">
-        <table class="tile_table">
-          <tr class="title-field" data-file-id-tile="${item.file_id}" >
-            <td>
-              <table>
-                <tr>
-                  <td>
-                    <img class="thumbnail" id="thumbnail_tiles${
-                        item.file_id
-                    }" src="" alt="thumbnail"    
-                     data-video-url="${item.file_url}" >
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="field_label">File Size</div>
-                    <div class="field_value">${(
-                        item.size /
-                        1024 /
-                        1024
-                    ).toFixed(2)} MB</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-            <td>
-              <table class="table_fields">
-                <tr>
-                  <td>
-                    <div class="field_label">Title</div>
-                    <div class="field_value"   data-title="${
-                        item.title
-                    }" data-file-id-tile="${item.file_id}" >${item.title}</div>
-                  </td>
+        <div class="tile">
+            <table class="tile_table">
+            <tr class="title-field" data-file-id-tile="${item.file_id}" >
+                <td class="tile-items">`;
 
-                </tr>
-                <tr>
-                  <td>
-                    <div class="field_label">Filename</div>
-                    <div class="field_value">
-                      <a href="${
-                          item.file_url
-                      }" class="hyperlink" target="_blank">
-                        ${item.file_name}
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="field_label">Description</div>
-                    <div class="field_value">${item.description}</div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="field_label">Attributes</div>
-                    <div class="field_value">
-                      Length: ${attributes.length}<br />
-                      Frame Rate: ${attributes.frame_rate} FPS<br />
-                      Audio Channels: ${attributes.audio_channels}<br />
-                      Resolution: ${attributes.video_resolution}<br />
-                      Sample Rate: ${attributes.audio_sample_rate} Hz
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </div>
-    `;
+        if (item.extension == 'FOLDER') {
+            html += `<p class="tile-icon">${FOLDER_ICON}</p>`;
+        } else if (item.media_type == 'audio') {
+            html += `<p class="tile-icon">${AUDIO_ICON}</p>`;
+        } else {
+            html += `<img class="thumbnail" id="thumbnail_tiles_${item.file_id}" 
+            src="" data-video-url="${item.file_url}" alt="thumbnail"
+            onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>`;
+        }
+
+        html += `   <div>`;
+
+        if (item.extension == 'FOLDER') {
+            html += `<span class="tile-text" onclick=selectFolderByID(${item.file_id})>
+                ${item.file_name}</span>`;
+        } else {
+            html += `<span class="tile-text" 
+                onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+                ${item.file_name}</span>`;
+        }
+
+        html += `   </div>`;
+
+        if (item.extension != 'FOLDER') {
+            html += `<div class="field_value">${formatSize(item.size)}</div>`;
+        }
+
+        html += `</td>
+            </tr>
+            </table>
+        </div>`;
     });
 
     if (append) {
@@ -544,16 +499,7 @@ function displayResultsTiles(data, append = false) {
     } else {
         resultsBodyTiles.innerHTML = html;
     }
-    const thumbnails = document.querySelectorAll(".thumbnail");
-    thumbnails.forEach((thumbnail) => {
-        thumbnail.addEventListener("click", () => {
-            const videoUrl = thumbnail.getAttribute("data-video-url");
-            const startTime = thumbnail.getAttribute("data-start-time");
 
-            // Open popup and play video
-            openVideoPopup(videoUrl, startTime);
-        });
-    });
     const titles = document.querySelectorAll(".title-field");
     titles.forEach((title) => {
         title.addEventListener("dblclick", () => {
@@ -569,7 +515,6 @@ function displayResultsTiles(data, append = false) {
             }
         });
     });
-    displayThumbnailsTiles(data);
 }
 
 function displayResults(results) {
@@ -579,7 +524,6 @@ function displayResults(results) {
     const resultsBody = document.getElementById("results-body");
     resultsBody.innerHTML = "";
 
-    displayResultsTiles(results);
     if (results == null) {
         resultsBody.innerHTML =
             '<tr><td colspan="21">API call returned null.</td></tr>';
@@ -596,20 +540,16 @@ function displayResults(results) {
         const item_type = item.extension == 'FOLDER' ? 'folder' : 'file';
         const row = document.createElement("tr");
         row.id = `row_${item_type}_${item.file_id}`;
-        row.addEventListener("dblclick", function (event) {
-            window.open(
-                "/app/media-player/?file_id=" + item.file_id + "&file_name=video",
-                "_blank"
-            );
-        });
 
         let html = `
         <td><div class='select-cell'>
             <input type='checkbox' id='cb_${item_type}_${item.file_id}'
             data-item-type='${item_type}'
             data-item-id='${item.file_id}'
-            data-item-name='${item.file_name}'>
+            data-item-name='${item.file_name}'
+            onclick='toggleContextButtons()'>
             <label for='cb_${item_type}_${item.file_id}'>${item.file_id}</label></td>`;
+
         if (item.extension == 'FOLDER') {
             html += `<td>${FOLDER_ICON}</td>`;
         } else if (item.media_type == 'audio') {
@@ -617,11 +557,24 @@ function displayResults(results) {
         } else {
             html += `
             <td><img class="thumbnail thumbnail_tab" id="thumbnail_${item.file_id}" 
-            src=""  data-video-url="${item.file_url}" alt="thumbnail"></td>`;
+            src=""  data-video-url="${item.file_url}" alt="thumbnail" 
+            onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+            </td>`;
         }
+
+        if (item.extension == 'FOLDER') {
+            html += `<td id="item_name_${item_type}_${item.file_id}">
+            <span style="cursor: pointer"
+                onclick=selectFolderByID(${item.file_id})>
+                ${item.file_name}</span></td>`;
+        } else {
+            html += `<td id="item_name_${item_type}_${item.file_id}">
+            <span style="cursor: pointer"
+                onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+                ${item.file_name}</span></td>`;
+        }
+
         html += `
-        <td id="item_name_${item_type}_${item.file_id}"><a href="${item.file_url}" 
-            class="hyperlink" target="_blank">${item.file_name}</a></td>
         <td>${item.extension.toUpperCase().replaceAll(".", "")}</td>
         <td>${item.media_source}</td>
         <td>${formatSize(item.size)}</td>
@@ -641,16 +594,6 @@ function displayResults(results) {
         row.innerHTML = html;
         resultsBody.appendChild(row);
     });
-    const thumbnails = document.querySelectorAll(".thumbnail_tab");
-    thumbnails.forEach((thumbnail) => {
-        thumbnail.addEventListener("click", () => {
-            const videoUrl = thumbnail.getAttribute("data-video-url");
-            const startTime = thumbnail.getAttribute("data-start-time");
-
-            // Open popup and play video
-            openVideoPopup(videoUrl, startTime);
-        });
-    });
 }
 
 document.getElementById("toggleViewBtn").addEventListener("click", function () {
@@ -668,48 +611,6 @@ document.getElementById("toggleViewBtn").addEventListener("click", function () {
         // displayTileView(); // Function to populate tiles
     }
 });
-
-function displayThumbnailsTiles(results) {
-    const csrftoken = getCookie("csrftoken");
-    results.forEach((item) => {
-        if (item.extension == 'FOLDER' || item.media_type == 'audio') {
-            return;
-        }
-        fetch(`/api/get-thumbnail/${item.file_id}/`, {
-            method: "GET",
-            headers: {
-                "Subscription-ID": SUBSCRIPTION_ID,
-                "Client-Secret": CLIENT_SECRET,
-                "X-CSRFToken": csrftoken,
-            },
-        })
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Network response was not ok");
-                }
-                return response.blob(); // Get the image data as a blob
-            })
-            .then((blob) => {
-                isValidJPEG(blob).then((isValid) => {
-                    if (isValid) {
-                        // Create a URL for the blob and display it as an image
-                        const imageUrl = URL.createObjectURL(blob);
-                        const imageObj = document.getElementById(
-                            "thumbnail_tiles" + item.file_id
-                        );
-                        imageObj.src = imageUrl;
-                    } else {
-                        console.error("Invalid JPEG file");
-                    }
-                });
-            })
-            .catch((error) => {
-                console.error("There was a problem with the fetch operation:", error);
-                document.getElementById("imageDisplay").innerHTML =
-                    "<p>Error loading image</p>";
-            });
-    });
-}
 
 function displayThumbnails(results) {
     const csrftoken = getCookie("csrftoken");
@@ -736,10 +637,10 @@ function displayThumbnails(results) {
                     if (isValid) {
                         // Create a URL for the blob and display it as an image
                         const imageUrl = URL.createObjectURL(blob);
-                        const imageObj = document.getElementById(
-                            "thumbnail_" + item.file_id
-                        );
-                        imageObj.src = imageUrl;
+                        const imageObj1 = document.getElementById("thumbnail_" + item.file_id);
+                        const imageObj2 = document.getElementById("thumbnail_tiles_" + item.file_id);
+                        imageObj1.src = imageUrl;
+                        imageObj2.src = imageUrl;
                     } else {
                         console.error("Invalid JPEG file");
                     }
@@ -802,21 +703,6 @@ function formatTime(seconds) {
     return sign + new Date(seconds * 1000).toISOString().slice(11, 23);
 }
 
-function updatePagination(results) {
-    if (results == null) return;
-
-    const prevPageButton = document.getElementById("prev-page");
-    const nextPageButton = document.getElementById("next-page");
-    const bottomPrevPageButton = document.getElementById("bottom-prev-page");
-    const bottomNextPageButton = document.getElementById("bottom-next-page");
-
-    prevPageButton.disabled = currentPage === 1;
-    bottomPrevPageButton.disabled = currentPage === 1;
-
-    nextPageButton.disabled = results.length < maxRows;
-    bottomNextPageButton.disabled = results.length < maxRows;
-}
-
 function goToPage(direction) {
     switch (direction) {
         case "top":
@@ -831,7 +717,7 @@ function goToPage(direction) {
             currentPage++;
             break;
     }
-    searchVideos(document.getElementById("search-box").value, currentFolder);
+    searchMedia(document.getElementById("search-box").value, currentFolder);
 }
 
 function displayError(message) {
@@ -956,6 +842,26 @@ function getFolders(parent_id = 1, target='folder-browser', is_popup=true, repos
         });
 }
 
+function selectFolderByID(folder_id) {
+    const csrftoken = getCookie("csrftoken");
+    fetch(`/api/get-folder/${folder_id}/`, {
+        method: "GET",
+        headers: {
+            "Subscription-ID": SUBSCRIPTION_ID,
+            "Client-Secret": CLIENT_SECRET,
+            "X-CSRFToken": csrftoken,
+        },
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        if (data.error) {
+            alert('Unable to get folder:' + data.error);
+        } else {
+            selectFolder(data.results[0]);
+        }
+    });
+}
+
 function selectFolder(folder) {
     const folderBrowser = document.getElementById("folder-browser");
     if (folderBrowser.classList.contains("folder-browser-visible")) {
@@ -965,9 +871,12 @@ function selectFolder(folder) {
     const breadCrumbs = document.getElementById("bread-crumbs");
     breadCrumbs.innerHTML = folder.path + folder.name;
     currentFolder = folder.path_name;
+    currentFolderID = folder.folder_id;
     updatePlaceholder();
     browseFolder(folder.folder_id);
     applyFilters();
+    setCookie('Library.currentFolder',currentFolder,7*24*60*60);
+    setCookie('Library.currentFolderID',currentFolderID,7*24*60*60);
 }
 
 function setMaxRows(value) {
@@ -977,6 +886,7 @@ function setMaxRows(value) {
     maxRowsLIs.forEach((li) => {
         if (li.id == "li-" + maxRows.toString()) {
             li.style.listStyleType = "disc";
+            setCookie("Library.maxRows",value);
         } else {
             li.style.listStyleType = "none";
         }
@@ -1019,17 +929,24 @@ function createModalOverlay(title, ok_label, items, selection='dropdown') {
     header.textContent = title;
 
     const closeButton = document.createElement('button');
-    closeButton.className = 'btn btn-primary';
+    closeButton.className = 'modal-btn modal-btn-close';
     closeButton.textContent = 'X';
+
+    // Modal subheader
+    const subheader = document.createElement('div');
+    subheader.className = 'modal-subheader';
+    subheader.textContent = `${items.length} folders/files selected:`;
 
     // Modal body
     const body = document.createElement('div');
     body.className = 'modal-body';
 
     // File/Folder list
+    let hasFolders = false;
     const itemList = document.createElement('div');
     itemList.className = 'item-list';
     items.forEach(([id,itemName,itemType]) => {
+        if (itemType == 'folder') hasFolders = true;
         const itemElement = document.createElement('div');
         itemElement.className = 'item-list-item';
         itemElement.textContent = (itemType == 'file' ? FILE_ICON : FOLDER_ICON) + ' ' + itemName;
@@ -1076,11 +993,25 @@ function createModalOverlay(title, ok_label, items, selection='dropdown') {
     // Footer with buttons
     const footer = document.createElement('div');
     footer.className = 'modal-footer';
-    footer.textContent = `${items.length} folders/files selected.`;
     footer.id = 'modal-footer';
 
+    const cbDiv = document.createElement('div');
+    cbDiv.className = 'modal-cb-div';
+
+    const checkBox = document.createElement('input');
+    checkBox.type = 'checkbox';
+    checkBox.id = 'modal-recursive';
+    checkBox.disabled = !hasFolders || ok_label == 'Move';
+
+    const cbLabel = document.createElement('label');
+    cbLabel.htmlFor = 'modal-recursive';
+    cbLabel.textContent = 'Apply action recursively';
+    cbLabel.className = hasFolders && (ok_label != 'Move') ? 'modal-label' : 'modal-label-disabled';
+    cbLabel.title = 'Applies the action to all subfolders and files under the selected folders.';
+    cbLabel.disabled = !hasFolders || ok_label == 'Move';
+
     const okButton = document.createElement('button');
-    okButton.className = 'btn btn-primary';
+    okButton.className = 'modal-btn modal-btn-primary';
     okButton.textContent = ok_label;
     okButton.id = 'modal-ok-button';
 
@@ -1093,9 +1024,13 @@ function createModalOverlay(title, ok_label, items, selection='dropdown') {
     header.appendChild(closeButton);
     body.appendChild(itemList);
     body.appendChild(userSelect);
+    cbDiv.appendChild(checkBox);
+    cbDiv.appendChild(cbLabel);
+    footer.appendChild(cbDiv);
     footer.appendChild(okButton);
 
     modalContent.appendChild(header);
+    modalContent.appendChild(subheader);
     modalContent.appendChild(body);
     modalContent.appendChild(footer);
     modalContent.appendChild(statusbar);
@@ -1326,8 +1261,11 @@ function setItemOwner() {
                 errors: []
             };
 
-            const promises = items.map(([id, itemName, itemType]) => {        
-                return fetch(`/api/set-${itemType}-owner/${id}/${selectedUser}/`, {
+            const recursive = document.getElementById('modal-recursive').checked;
+            const promises = items.map(([id, itemName, itemType]) => { 
+                const endpoint = (itemType == 'file') ? 'set-file-owner' : 
+                                 (recursive ? 'set-tree-owner' : 'set-folder-owner');
+                return fetch(`/api/${endpoint}/${id}/${selectedUser}/`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1439,8 +1377,11 @@ function setItemGroup() {
                 errors: []
             };
 
+            const recursive = document.getElementById('modal-recursive').checked;
             const promises = items.map(([id, itemName, itemType]) => {        
-                return fetch(`/api/set-${itemType}-group/${id}/${selectedGroup}/`, {
+                const endpoint = (itemType == 'file') ? 'set-file-group' : 
+                                 (recursive ? 'set-tree-group' : 'set-folder-group');
+                return fetch(`/api/${endpoint}/${id}/${selectedGroup}/`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1533,9 +1474,12 @@ function setItemAccess() {
                 errors: []
             };
 
+            const recursive = document.getElementById('modal-recursive').checked;
             const csrftoken = getCookie("csrftoken");
             const promises = items.map(([id, itemName, itemType]) => {        
-                return fetch(`/api/set-${itemType}-permission/${id}/${o_r}/${g_r}/${d_r}/${p_r}/`, {
+                const endpoint = (itemType == 'file') ? 'set-file-permission' : 
+                                 (recursive ? 'set-tree-permission' : 'set-folder-permission');
+                return fetch(`/api/${endpoint}/${id}/${o_r}/${g_r}/${d_r}/${p_r}/`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1582,4 +1526,467 @@ function setItemAccess() {
                 }
             });
     };
+}
+
+function createFolder() {
+    // Create modal elements
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    // Modal header
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    header.textContent = 'New Folder';
+
+    const closeButton = document.createElement('button');
+    closeButton.className = 'btn btn-primary';
+    closeButton.textContent = 'X';
+
+    // Modal body
+    const body = document.createElement('div');
+    body.className = 'modal-body';
+
+    // Folder details
+    const folderName = document.createElement('input');
+    folderName.type = 'text';
+    folderName.id = 'new-folder-name';
+    folderName.className = 'modal-input';
+
+    const folderNameLabel = document.createElement('label');
+    folderNameLabel.htmlFor = 'new-folder-name';
+    folderNameLabel.textContent = 'Name:';
+
+    const folderDesc = document.createElement('textarea');
+    folderDesc.rows = 3;
+    folderDesc.id = 'new-folder-desc';
+    folderDesc.className = 'modal-input';
+
+    const folderDescLabel = document.createElement('label');
+    folderDescLabel.htmlFor = 'new-folder-desc';
+    folderDescLabel.textContent = 'Description:';
+
+    // Footer with buttons
+    const footer = document.createElement('div');
+    footer.className = 'modal-footer-single';
+    footer.textContent = ' ';
+    footer.id = 'modal-footer';
+
+    const okButton = document.createElement('button');
+    okButton.className = 'btn btn-primary';
+    okButton.textContent = 'Create';
+    okButton.id = 'modal-ok-button';
+
+    // Subfooter for error messages
+    const statusbar = document.createElement('div');
+    statusbar.className = 'modal-body';
+    statusbar.id = 'modal-statusbar';
+
+    // Assemble modal
+    header.appendChild(closeButton);
+    body.appendChild(folderNameLabel);
+    body.appendChild(folderName);
+    body.appendChild(folderDescLabel);
+    body.appendChild(folderDesc);
+    footer.appendChild(okButton);
+
+    modalContent.appendChild(header);
+    modalContent.appendChild(body);
+    modalContent.appendChild(footer);
+    modalContent.appendChild(statusbar);
+    modalOverlay.appendChild(modalContent);
+
+    // Handle button clicks
+    closeButton.onclick = () => {
+        modalOverlay.remove();
+    };
+
+    okButton.onclick = () => {
+        const newName = folderName.value.trim();
+        if (newName.length == 0) {
+            alert('You must enter a folder name.');
+            return;
+        }
+
+        const csrftoken = getCookie("csrftoken");
+        fetch(`/api/create-folder/${currentFolderID}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Subscription-ID': SUBSCRIPTION_ID,
+                'Client-Secret': CLIENT_SECRET,
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({ 'name': newName, 'description': folderDesc.value })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                // TO DO: show the new folder
+                modalOverlay.remove();
+            }
+        })
+        .catch(error => {
+            alert('Unable to rename folder/file. Please try again.');
+        });
+    }
+
+    document.body.appendChild(modalOverlay);
+    folderName.focus();
+}
+
+function displayAsset(file_id, filename, type, source) {
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'viewer-overlay';
+
+    // Viewer header
+    const header = document.createElement('div');
+    header.className = 'viewer-header';
+    modalOverlay.appendChild(header);
+
+    const title = document.createElement('span');
+    title.textContent = filename;
+    header.appendChild(title);
+
+    const closeButton = document.createElement('button');
+    closeButton.className = 'viewer-close-button';
+    closeButton.textContent = '\u24E7';
+    closeButton.onclick = function() { modalOverlay.remove(); }
+    header.appendChild(closeButton);
+
+    // Viewer content
+    const content = document.createElement('div');
+    content.className = 'viewer-content';
+    modalOverlay.appendChild(content);
+
+    // Content left panel
+    const leftPanel = document.createElement('div');
+    leftPanel.className = 'viewer-left-panel';
+    content.appendChild(leftPanel);
+
+    // Media container
+    const mediaContainer = document.createElement('div');
+    mediaContainer.className = 'media-container';
+    mediaContainer.id = 'media-container';
+    leftPanel.appendChild(mediaContainer);
+
+    // Create asset element
+    let assetElement = null;
+    if (type === 'photo') {
+        assetElement = document.createElement('img');
+        assetElement.src = source;
+    } else if (type === 'video') {
+        assetElement = document.createElement('video');
+        assetElement.src = source;
+        assetElement.controls = true;
+    } else if (type === 'audio') {
+        assetElement = document.createElement('audio');
+        assetElement.src = source;
+        assetElement.controls = true;
+    } else if (type === 'pdf') {
+        assetElement = document.createElement('iframe');
+        assetElement.src = source;
+        assetElement.style.width = "100%";
+        assetElement.style.height = "500px";
+    }
+    mediaContainer.appendChild(assetElement);
+
+    // Content right panel
+    const rightPanel = document.createElement('div');
+    rightPanel.className = 'viewer-right-panel';
+    rightPanel.id = 'asset-details';
+    content.appendChild(rightPanel);
+
+    // Right panel tabs
+    const tabs = document.createElement('div');
+    rightPanel.appendChild(tabs);
+    tabs.className = 'asset-tabs';
+
+    const btnBasic = document.createElement('button');
+    btnBasic.textContent = 'Basic';
+    btnBasic.className = 'asset-tab asset-tab-selected';
+    btnBasic.id = 'asset-tab-basic';
+    btnBasic.onclick = function() { showAssetTab('basic'); };
+    tabs.appendChild(btnBasic);
+
+    const btnISO = document.createElement('button');
+    btnISO.textContent = 'ISO';
+    btnISO.className = 'asset-tab asset-tab-unselected';
+    btnISO.id = 'asset-tab-iso';
+    btnISO.onclick = function() { showAssetTab('iso'); };
+    tabs.appendChild(btnISO);
+
+    const btnExtras = document.createElement('button');
+    btnExtras.textContent = 'Extras';
+    btnExtras.className = 'asset-tab asset-tab-unselected';
+    btnExtras.id = 'asset-tab-extras';
+    btnExtras.onclick = function() { showAssetTab('extras'); };
+    tabs.appendChild(btnExtras);
+
+    const btnAudit = document.createElement('button');
+    btnAudit.textContent = 'Audit';
+    btnAudit.className = 'asset-tab asset-tab-unselected';
+    btnAudit.id = 'asset-tab-audit';
+    btnAudit.setAttribute('file_id', file_id);
+    btnAudit.setAttribute('initialized', 'false');
+    btnAudit.onclick = function() { showAssetTab('audit'); };
+    tabs.appendChild(btnAudit);
+
+    displayAssetInfo(rightPanel,file_id);
+
+    document.body.appendChild(modalOverlay);
+}
+
+function displayAssetInfo(container, file_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-media/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.log(data.error);
+        } else {
+            if (data.results.length > 0) {
+                showAssetDetails(container, data.results[0]);
+            } else {
+                alert('Record not found.');
+            }
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function showAssetDetails(container, data) {
+        
+    function pairsToRows(table, jsonData, inclusions, titlecase=true) {
+        for (const [key, value] of Object.entries(jsonData)) {
+            if (inclusions) {
+                if (!inclusions.includes(key)) {
+                    continue;
+                }
+            }
+
+            const row = document.createElement("tr");
+            
+            const keyCell = document.createElement("td");
+            keyCell.textContent = titlecase ? toTitleCase(key.replace('_',' ')) : key;
+            keyCell.className = 'asset-details-key';
+            
+            const valueCell = document.createElement("td");
+            valueCell.textContent = value;
+            valueCell.className = 'asset-details-value';
+            
+            row.appendChild(keyCell);
+            row.appendChild(valueCell);
+            table.appendChild(row);
+        }
+    }
+
+    const basicKeys = ['file_id','file_name','folder_name','extension','media_type','media_source','size',
+                       'file_url','archive_url','date_created','date_uploaded','description',
+                       'tags','people','places','texts',
+                       'last_accessed','last_modified','owner_id','owner_name','group_id','group_name',
+                       'owner_rights','group_rights','domain_rights','ip_location','remarks',
+                       'version','file_status'];
+    const tableBasic = document.createElement("table");
+    tableBasic.className = 'asset-details';
+    tableBasic.id = 'asset-details-basic';
+    tableBasic.style.display = 'table';
+    pairsToRows(tableBasic, data, basicKeys);
+    container.appendChild(tableBasic);
+
+    const isoKeys = ['file_id','file_name','title','creator','subject','description','publisher',
+                     'contributor','date_created','media_type','media_source','identifier','source',
+                     'language','relation','coverage','rights'];
+    const tableISO = document.createElement('table');
+    tableISO.className = 'asset-details';
+    tableISO.id = 'asset-details-iso';
+    tableISO.style.display = 'none';
+    pairsToRows(tableISO, data, isoKeys);
+    container.appendChild(tableISO);
+
+    const divExtras = document.createElement('div');
+    divExtras.id = 'asset-details-extras';
+    divExtras.style.display = 'none';
+
+    const labelAttributes = document.createElement('p');
+    labelAttributes.textContent = 'Attributes';
+    labelAttributes.className = 'asset-label';
+    divExtras.appendChild(labelAttributes);
+
+    const tableAttributes = document.createElement('table');
+    tableAttributes.className = 'asset-details';
+    tableAttributes.id = 'asset-details-attributes';
+    pairsToRows(tableAttributes, JSON.parse(data.attributes), null, false);
+    divExtras.appendChild(tableAttributes);
+
+    const labelExtraData = document.createElement('p');
+    labelExtraData.textContent = 'Extra Data';
+    labelExtraData.className = 'asset-label';
+    divExtras.appendChild(labelExtraData);
+
+    const tableExtraData = document.createElement('table');
+    tableExtraData.className = 'asset-details';
+    tableExtraData.id = 'asset-details-attributes';
+    pairsToRows(tableExtraData, JSON.parse(data.extra_data), null, false);
+    divExtras.appendChild(tableExtraData);
+
+    container.appendChild(divExtras);
+
+    const divAudit = document.createElement('div');
+    divAudit.id = 'asset-details-audit-div';
+    divAudit.style.display = 'none';
+    divAudit.className = 'asset-audit-div';
+
+    const tableAudit = document.createElement('table');
+    tableAudit.className = 'asset-audit-table';
+    tableAudit.id = 'asset-details-audit';
+    tableAudit.innerHTML = '<tr><td>Display audit history here.</td></tr>';
+    divAudit.appendChild(tableAudit);
+
+    container.appendChild(divAudit);
+}
+
+function showAssetTab(tab) {
+    const tabBasic = document.getElementById('asset-tab-basic');
+    const tabISO = document.getElementById('asset-tab-iso');
+    const tabExtras = document.getElementById('asset-tab-extras');
+    const tabAudit = document.getElementById('asset-tab-audit');
+
+    const tableBasic = document.getElementById('asset-details-basic');
+    const tableISO = document.getElementById('asset-details-iso');
+    const divExtras = document.getElementById('asset-details-extras');
+    const divAudit = document.getElementById('asset-details-audit-div');
+
+    if (tab == 'basic' && tableBasic) {
+        tabBasic.classList.remove('asset-tab-unselected');
+        tabISO.classList.remove('asset-tab-selected');
+        tabExtras.classList.remove('asset-tab-selected');
+        tabAudit.classList.remove('asset-tab-selected');
+
+        tabBasic.classList.add('asset-tab-selected');
+        tabISO.classList.add('asset-tab-unselected');
+        tabExtras.classList.add('asset-tab-unselected');
+        tabAudit.classList.add('asset-tab-unselected');
+
+        tableBasic.style.display = 'table';
+        tableISO.style.display = 'none';
+        divExtras.style.display = 'none';
+        divAudit.style.display = 'none';
+
+    } else if (tab == 'iso') {
+        tabBasic.classList.remove('asset-tab-selected');
+        tabISO.classList.remove('asset-tab-unselected');
+        tabExtras.classList.remove('asset-tab-selected');
+        tabAudit.classList.remove('asset-tab-selected');
+
+        tabBasic.classList.add('asset-tab-unselected');
+        tabISO.classList.add('asset-tab-selected');
+        tabExtras.classList.add('asset-tab-unselected');
+        tabAudit.classList.add('asset-tab-unselected');
+
+        tableBasic.style.display = 'none';
+        tableISO.style.display = 'table';
+        divExtras.style.display = 'none';
+        divAudit.style.display = 'none';
+
+    } else if (tab == 'extras') {
+        tabBasic.classList.remove('asset-tab-selected');
+        tabISO.classList.remove('asset-tab-selected');
+        tabExtras.classList.remove('asset-tab-unselected');
+        tabAudit.classList.remove('asset-tab-selected');
+
+        tabBasic.classList.add('asset-tab-unselected');
+        tabISO.classList.add('asset-tab-unselected');
+        tabExtras.classList.add('asset-tab-selected');
+        tabAudit.classList.add('asset-tab-unselected');
+
+        tableBasic.style.display = 'none';
+        tableISO.style.display = 'none';
+        divExtras.style.display = 'block';
+        divAudit.style.display = 'none';
+
+    } else if (tab == 'audit') {
+        if (tabAudit.getAttribute('initialized') == 'false') {
+            showAssetAudit(tabAudit.getAttribute('file_id'));
+        }
+
+        tabBasic.classList.remove('asset-tab-selected');
+        tabISO.classList.remove('asset-tab-selected');
+        tabExtras.classList.remove('asset-tab-selected');
+        tabAudit.classList.remove('asset-tab-unselected');
+
+        tabBasic.classList.add('asset-tab-unselected');
+        tabISO.classList.add('asset-tab-unselected');
+        tabExtras.classList.add('asset-tab-unselected');
+        tabAudit.classList.add('asset-tab-selected');
+
+        tableBasic.style.display = 'none';
+        tableISO.style.display = 'none';
+        divExtras.style.display = 'none';
+        divAudit.style.display = 'table';
+    }
+}
+
+function showAssetAudit(file_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-audit/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Max-Rows': maxRows,
+            'Source-Table': 'mbox_file',
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.log(data.error);
+        } else {
+            displayAudit(data.results);
+        }
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+
+function displayAudit(results) {
+    const tableAudit = document.getElementById('asset-details-audit');
+
+    // Construct table header
+    let html = '<tr><th>ID</th><th>User</th><th>Activity</th><th>Timestamp</th>';
+    html += '<th>Location</th><th>Old Data</th><th>New Data</th></tr>';
+
+    results.forEach(item => {
+        html += `<tr>
+            <td>${item.audit_id}</td>
+            <td>${item.username}</td>
+            <td>${item.activity}</td>
+            <td>${item.event_timestamp.replace('T',' ').substring(0,23)}</td>
+            <td>${item.location}</td>
+            <td>${item.old_data}</td>
+            <td>${item.new_data}</td>
+        </tr>`;
+    });
+
+    tableAudit.innerHTML = html;
+
+    const tabAudit = document.getElementById('asset-tab-audit');
+    tabAudit.setAttribute('initialized', 'true');
 }
