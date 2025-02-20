@@ -469,6 +469,26 @@ function isValidTsQueryString(queryString) {
     return true;
 }
 
+function ratingToColor(rating) {
+    if (rating < 0.25) {
+        return 'black';
+    } else if (rating < 0.40) {
+        return 'red';
+    } else if (rating < 0.50) {
+        return 'orangered';
+    } else if (rating < 0.60) {
+        return 'orange';
+    } else if (rating < 0.70) {
+        return 'gold';
+    } else if (rating < 0.80) {
+        return 'yellow';
+    } else if (rating < 0.90) {
+        return 'greenyellow';
+    } else {
+        return 'green';
+    }
+}
+
 function sanitizeHtml(str) {
   const map = {
     '&': '&amp;',
@@ -596,14 +616,16 @@ function vttToHTML(vttString,class_name='cue-text') {
     const line = lines[i].trim();
     
     if (i === 0 && line === 'WEBVTT') {
-      tableHTML += `<tr><td>${line}</td></tr>`;
+      tableHTML += `<tr><td style="width:3px;"></td><td>${line}</td></tr>`;
     } else if (line === '') {
       if (inCue) {
         const paddedId = cueStart.replace(/[:\.]/g, '').padStart(9, '0');
         const cueEndZP = cueEnd.replace(/[:\.]/g, '').padStart(9, '0');
         tableHTML += `<tr id="${paddedId}" data-cueend="${cueEndZP}">
-          <td><p id="cue-timestamp-${paddedId}" class="cue-timestamp">${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
-          <p id="cue-text-${paddedId}" class="${class_name}"
+          <td id="cue-conf-${paddedId}" data-cuestart="${cueStart}"></td>
+          <td class="cue-data">
+            <p id="cue-timestamp-${paddedId}" class="cue-timestamp">${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
+            <p id="cue-text-${paddedId}" class="${class_name}"
               data-cuestart="${cueStart}" data-cueend="${cueEnd}">${cueText || '&nbsp;'}</p></td>
         </tr>`;
         inCue = false;
@@ -618,7 +640,7 @@ function vttToHTML(vttString,class_name='cue-text') {
       cueText += (cueText ? '<br>' : '') + line;
     } else if (!line.includes('-->')) {
       // Assume this is metadata
-      tableHTML += `<tr><td>${line}</td></tr>`;
+      tableHTML += `<tr><td colspan=2>${line}</td></tr>`;
     }
   }
 
@@ -626,8 +648,11 @@ function vttToHTML(vttString,class_name='cue-text') {
   if (inCue) {
     const paddedId = cueStart.replace(/[:\.]/g, '').padStart(9, '0');
     tableHTML += `<tr id="${paddedId}">
-      <td><p>${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
-      <p>${cueText || '&nbsp;'}</p></td>
+      <td id="cue-conf-${paddedId}" data-cuestart="${cueStart}"></td>
+      <td class="cue-data">
+        <p id="cue-timestamp-${paddedId}" class="cue-timestamp">${cueStart}&nbsp;-->&nbsp;${cueEnd}</p>
+        <p id="cue-text-${paddedId}" class="${class_name}"
+          data-cuestart="${cueStart}" data-cueend="${cueEnd}">${cueText || '&nbsp;'}</p></td>
     </tr>`;
   }
 

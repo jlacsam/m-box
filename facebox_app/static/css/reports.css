@@ -76,8 +76,9 @@ ul li:hover {
 
 #reports-menu {
     width: 100%;
-    margin-top: 70px;
-    border-bottom: 1px solid #1871ff;
+    margin-top: 64px;
+    background-color: #1871ff;
+    padding-bottom: 5px;
 }
 
 .report-item {
@@ -279,7 +280,6 @@ ul li:hover {
     table-layout: fixed;
     font-size: 0.8em;
     border-collapse: collapse;
-    margin: 15px
 }
 
 .results-table th, .results-table td {
@@ -316,41 +316,66 @@ ul li:hover {
     color: white;
 }
 
+.browse-folder-label {
+    color: black;
+}
+
+.browse-folder-label:hover {
+    background-color: yellow;
+    cursor: pointer;
+}
+
 .results-div {
     display: flex;
     flex-direction: column;
     width: 100%;
+    padding: 15px;
     box-sizing: border-box;
 }
 
-.audit-elements {
+.audit-elements, .ratings-elements {
     flex: 1;
+    padding-bottom: 15px;
     box-sizing: border-box;
 }
 
 .search-input-wrapper {
-	 position: relative;
-	 display: inline-block;
-    margin-top: 15px;
-    margin-left: 15px;
+    position: relative;
+    display: inline-block;
 }
 
 .search-input {
-	 padding-right: 30px; /* Space for the clear button */
+    font-family: sans-serif;
+	padding-right: 30px; /* Space for the clear button */
+}
+
+.scope-input {
+    font-family: sans-serif;
+    width: 300px;
+    height: 24px;
+    padding: 2px;
+    color: black;
+    background-color: white;
+}
+
+.ratings-select {
+    font-family: sans-serif;
+    height: 24px;
 }
 
 .clear-button {
-	 position: absolute;
-	 right: 5px;
-	 top: 50%;
-	 transform: translateY(-50%);
-	 display: none;
-	 cursor: pointer;
-	 font-size: 18px;
-	 color: #999;
+	position: absolute;
+	right: 5px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: none;
+	cursor: pointer;
+	font-size: 18px;
+	color: #999;
 }
 
-.search-button {
+.search-button, .get-ratings-button {
+    font-family: sans-serif;
     height: 24px;
     border-radius: 12px;
 }
@@ -375,4 +400,23 @@ ul li:hover {
 .json-highlight .boolean { color: #b22222; }
 .json-highlight .null { color: #808080; }
 .json-highlight .key { color: #c52a2a; }
+
+.clickable-text {
+    cursor: pointer;
+}
+
+.folder-browser-hidden {
+  position: fixed;
+  display: none;
+  z-index: 0;
+}
+
+.folder-browser-visible {
+  position: fixed;
+  display: flex;
+  width: 160px;
+  z-index: 1002;
+  background-color: white;
+  color: black;
+}
 

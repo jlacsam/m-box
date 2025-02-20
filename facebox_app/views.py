@@ -1162,6 +1162,124 @@ def get_transcript(request,file_id):
         return Response({'transcript': []}, status=status.HTTP_200_OK)
 
 
+# Get transcript confidence report #################################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_transcript_ratings(request):
+    max_rows = request.headers.get('Max-Rows')
+    sort_order = request.headers.get('Sort-Order')
+    start_from = request.headers.get('Start-From')
+    scope = request.headers.get('Scope')
+    media_type = request.headers.get('Media-Type')
+
+    # Determine sort order
+    if sort_order.lower().startswith('desc'):
+        sort_order = 'DESC'
+    else:
+        sort_order = 'ASC'
+
+    # Initialize offset
+    offset = 0
+    if start_from is not None:
+        offset = start_from
+
+    # Append a wild card for the LIKE operator
+    if scope[-1] != '/':
+        scope += '/%'
+    else:
+        scope += '%'
+
+    # Default media type is video
+    if media_type is None:
+        media_types = ('video',)
+        placeholders = '%s'
+    else:
+        media_types = tuple(media_type.split(','))
+        placeholders = ','.join(['%s'] * len(media_types))
+
+    # Search for matching records in the database
+    labels = ['file_id', 'folder_id', 'file_name', 'extension', 'media_type', 'media_source', 
+              'size', 'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 
+              'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
+              'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 
+              'version', 'transcript_stats', 'attributes', 'path_name', 'subject', 'remarks']
+
+    query = """
+        SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, 
+            fl.size, fl.file_url, fl.archive_url, fl.date_created, fl.date_uploaded, fl.description, 
+            fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
+            fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, 
+            fl.version, fl.transcript_stats, fl.attributes, fd.path_name, fl.subject, fl.remarks
+        FROM mbox_file fl, mbox_folder fd
+        WHERE fl.folder_id = fd.folder_id AND 
+            fd.path_name LIKE %s AND
+            fl.media_type IN ({}) AND 
+            NOT fl.is_deleted 
+        ORDER BY fl.transcript_stats ->> 'rating' 
+        """.format(placeholders)
+
+    query += " ASC " if sort_order.lower().startswith('asc') else " DESC "
+
+    query += """
+        LIMIT %s
+        OFFSET %s
+        """
+
+    rows = []
+    with connection.cursor() as cursor:
+        params = (scope,) + media_types + (max_rows, offset)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'GET TRANSCRIPT RATINGS','mbox_file',0,None,str(params),get_client_ip(request))
+
+    # Serialize the results and return the response
+    if len(rows):
+        rows = override_file_url(rows, labels)
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
+# Get transcript confidence by chunk ###############################################################
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@validate_subscription_headers
+def get_chunk_ratings(request,file_id):
+
+    # Search for matching records in the database
+    labels = ['chunk_id','file_id','time_start','time_end','confidence']
+
+    query = """
+        SELECT chunk_id, file_id, time_start, time_end, confidence
+        FROM mbox_transcript
+        WHERE file_id = %s AND source = 'T'
+        ORDER BY time_start
+        """
+
+    rows = []
+    with connection.cursor() as cursor:
+        cursor.execute(query, (file_id,))
+        rows = cursor.fetchall()
+
+    # Close database connection
+    cursor.close()
+
+    # Insert an audit record for this action
+    insert_audit(request.user.username,'GET CHUNK RATINGS','mbox_file',file_id,None,None,get_client_ip(request))
+
+    # Serialize the results and return the response
+    if len(rows):
+        return Response({'results': tuples_to_json(rows,labels)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'results': []}, status=status.HTTP_200_OK)
+
+
 # Get audit records for a file #####################################################################
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

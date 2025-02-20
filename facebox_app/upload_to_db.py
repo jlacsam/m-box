@@ -150,6 +150,13 @@ def update_media2(conn, file_id, file_url, attributes, extra_data):
     cursor.close()
     return count
 
+def update_media3(conn, file_id, stat_data):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            UPDATE mbox_file SET transcript_stats = %s WHERE file_id = %s
+        """, (json.dumps(stat_data), file_id))
+        return cursor.rowcount
+
 def load_uris(filename):
     uris_dict = {}
     with open(filename, newline='', encoding='utf-8') as csvfile:
@@ -172,7 +179,6 @@ def load_metadata(filename):
             }
     return metadata_dict
 
-
 def load_attributes(attributes_file):
     attribs_dict = {}
     with open(attributes_file, newline='', encoding='utf-8') as csvfile:
@@ -183,6 +189,14 @@ def load_attributes(attributes_file):
             attribs_dict[filename] = {header: row[header] for header in headers}
     return attribs_dict
 
+def load_stats(stats_file):
+    stats_dict = {}
+    with open(stats_file, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        headers = reader.fieldnames
+        for row in reader:
+            stats_dict[row['filename']] = {header: row[header] for header in headers}
+    return stats_dict
 
 def are_columns_empty(conn, file_id, columns):
     # Construct the SQL query which looks like this:
@@ -213,12 +227,13 @@ def has_embeddings(conn, file_id):
 def insert_embeddings(conn, file_id, embeddings):
     cursor = conn.cursor()
     query = """
-        INSERT INTO mbox_transcript (file_id, chunk, source, time_start, time_end, embedding)
+        INSERT INTO mbox_transcript (file_id, chunk, source, time_start, time_end, confidence, embedding)
         VALUES %s
     """
     # Prepare data for bulk insertion
     values = [
-        (file_id, chunk['text'], chunk['source'], chunk['time_start'], chunk['time_end'], chunk['embedding'])
+        (file_id, chunk['text'], chunk['source'], chunk['time_start'], chunk['time_end'], 
+         chunk['confidence'], chunk['embedding'])
         for chunk in embeddings
     ]
     execute_values(cursor, query, values)
@@ -347,15 +362,18 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
     affected = update_folder_group(conn, folder_id, group_id, group_name)
     print(f"Folder group of {folder} is {'updated' if affected else 'unchanged'}.")
 
-    # Load file uris, attribs & metadata
-    filename = f"{data_dir}/{container}/{container}__{folder}.uri"
+    # Load file uris, attribs, metadata and stats
+    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.uri"
     uris_dict = load_uris(filename)
 
-    filename = f"{data_dir}/{container}/{container}__{folder}.csv"
+    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.csv"
     metadata_dict = load_metadata(filename)
 
-    filename = f"{data_dir}/{container}/{container}__{folder}.attribs"
+    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.attribs"
     attribs_dict = load_attributes(filename)
+
+    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.stats"
+    stats_dict = load_stats(filename)
 
     # The number of records for the above sources must match.
     if len(uris_dict) != len(metadata_dict):
@@ -372,6 +390,7 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
     count_upd3 = 0 # counter for embeddings
     count_upd4 = 0 # counter for owner_id and owner_name
     count_upd5 = 0 # counter for group_id and group_name
+    count_upd6 = 0 # counter for stats
     count = 0
     captions_dir = os.path.join(data_dir,f"{container}/{folder}")
     for media_file, uri in uris_dict.items():
@@ -449,6 +468,13 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
         else:
             print(f"Skipping {path_name}/{media_file} for uri/attribs/metadata ...")
 
+        # Update the database with stats
+        if are_columns_empty(conn, file_id, ['transcript_stats']):
+            print(f"Updating {path_name}/{media_file} with stats data ...")
+            count_upd6 += update_media3(conn, file_id, stats_dict[id])
+        else:
+            print(f"Skipping {path_name}/{media_file} for stats ...")
+
         # Update the database with transcript embeddings
         if not has_embeddings(conn, file_id): 
             print(f"Inserting transcript embeddings for {path_name}/{media_file} ...")
@@ -471,7 +497,7 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
         count += 1
 
     print(f"{count} total records. {count_inserted} inserted. " \
-          f"{count_upd1}/{count_upd2}/{count_upd3}/{count_upd4}/{count_upd5} updated.")
+          f"{count_upd1}/{count_upd2}/{count_upd3}/{count_upd4}/{count_upd5}/{count_upd6} updated.")
 
 
 if __name__ == "__main__":

@@ -676,7 +676,7 @@ audio {
     width: 35%;
     background-color: #f1f7fa;
     height: 100%;
-    padding: 10px;
+    padding: 10px 10px 10px 1px;
     overflow: auto;
     vertical-align: top;
 }
@@ -762,4 +762,8 @@ tr.highlighted {
     position: fixed;
     top: 65px;
     right: 10px;
+}
+
+.cue-data {
+    padding-left: 3px;
 }

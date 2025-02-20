@@ -662,6 +662,53 @@ function showDetails(data) {
 }
 
 function showTranscript(file_id) {
+
+    function findChunk(chunks, cue_start) { 
+        for (let i = 0; i < chunks.length; i++) {
+            let chunk = chunks[i];
+            if (chunk.time_start <= cue_start && cue_start <= chunk.time_end) {
+                return chunk;
+            }
+        }
+        return null;
+    }
+
+    function colorizeCues(file_id, chunk_ratings) {
+        document.querySelectorAll('[id^="cue-conf-"]').forEach(element => {
+            const cueStartStr = element.getAttribute('data-cuestart');
+            if (cueStartStr) {
+                const cueStart = timeStringToSeconds(element.getAttribute('data-cuestart'));
+                const chunk = findChunk(chunk_ratings, cueStart);
+                if (chunk) {
+                    element.style.backgroundColor = ratingToColor(chunk.confidence);
+                }
+            }
+        });
+    }
+
+    function getChunkRatings(file_id) {
+        const csrftoken = getCookie('csrftoken');
+        fetch(`/api/get-chunk-ratings/${file_id}/`, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'Subscription-ID': SUBSCRIPTION_ID,
+                'Client-Secret': CLIENT_SECRET,
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.log(data.error);
+            } else {
+                colorizeCues(file_id, data.results);
+            }
+        })
+        .catch(error => {
+            console.log(error);
+        });
+    }
+
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-transcript/${file_id}/`, {
         method: 'GET',
@@ -722,6 +769,8 @@ function showTranscript(file_id) {
                 event.preventDefault();
            }
         });
+
+        getChunkRatings(file_id);
     })
     .catch(error => {
         const transcript = document.getElementById('transcript');

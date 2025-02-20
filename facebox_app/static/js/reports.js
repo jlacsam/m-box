@@ -63,8 +63,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const reportsTab = document.getElementById('reports-tab');
     reportsTab.style.color = '#ffffff';
 
+    // Get initial max rows
+    savedMaxRows = getCookie('Reports.maxRows');
+    if (savedMaxRows) maxRows = parseInt(savedMaxRows);
     setMaxRows(maxRows);
-    showAudit();
+
+    // Get initial tab
+    savedTab = getCookie('Reports.activeTab');
+    if (savedTab == 'Audit Records') {
+        showAudit();
+    } else if (savedTab == 'Folder Counts') {
+        showFolders(1);
+    } else if (savedTab == 'Transcript Ratings') {
+        showRatings(1);
+    } else {
+        showAudit();
+    }
+
     getGroups();
 });
 
@@ -140,7 +155,9 @@ function searchAudit() {
     const auditRecords = document.getElementById('audit-records');
     auditRecords.style.color = '#ffffff';
     const folderCounts = document.getElementById('folder-counts');
-    folderCounts.style.color = '#888888';
+    folderCounts.style.color = '#333333';
+    const transcriptRatings = document.getElementById('transcript-ratings');
+    transcriptRatings.style.color = '#333333';
 
     let username = document.getElementById('username-search').value;
     let start_date = document.getElementById('start-date').value;
@@ -188,7 +205,9 @@ function showAudit() {
     const auditRecords = document.getElementById('audit-records');
     auditRecords.style.color = '#ffffff';
     const folderCounts = document.getElementById('folder-counts');
-    folderCounts.style.color = '#888888';
+    folderCounts.style.color = '#333333';
+    const transcriptRatings = document.getElementById('transcript-ratings');
+    transcriptRatings.style.color = '#333333';
 
     const resultsDiv = document.getElementById('results-div');
     let html = `<div class='audit-elements'>
@@ -205,6 +224,7 @@ function showAudit() {
     resultsDiv.innerHTML = html;
 
     searchAudit();
+    setCookie('Reports.activeTab', 'Audit Records');
 }
 
 function displayAudit(results) {
@@ -239,7 +259,9 @@ function showFolders(parent_id = 1) {
     const folderCounts = document.getElementById('folder-counts');
     folderCounts.style.color = '#ffffff';
     const auditRecords = document.getElementById('audit-records');
-    auditRecords.style.color = '#888888';
+    auditRecords.style.color = '#333333';
+    const transcriptRatings = document.getElementById('transcript-ratings');
+    transcriptRatings.style.color = '#333333';
 
     function fetchFolders(parent_id = 1) {
         const csrftoken = getCookie('csrftoken');
@@ -390,6 +412,8 @@ function showFolders(parent_id = 1) {
         console.log(error);
         alert('An error occurred while fetching the root folder.');
     });
+
+    setCookie('Reports.activeTab', 'Folder Counts');
 }
 
 function selectFolder(folder) {
@@ -403,6 +427,7 @@ function setMaxRows(value) {
     maxRowsLIs.forEach(li => {
         if (li.id == ("li-"+maxRows.toString())) {
             li.style.listStyleType = 'disc';
+            setCookie("Reports.maxRows",value);
         } else {
             li.style.listStyleType = 'none';
         }
@@ -473,3 +498,274 @@ function replaceRow(folder) {
     cols[9].innerHTML = folder.file_count - folder.reviewed_count;
     cols[10].innerHTML = folder.reviewed_count;
 }
+
+function showRatings() {
+    const folderCounts = document.getElementById('folder-counts');
+    folderCounts.style.color = '#333333';
+    const auditRecords = document.getElementById('audit-records');
+    auditRecords.style.color = '#333333';
+    const transcriptRatings = document.getElementById('transcript-ratings');
+    transcriptRatings.style.color = '#ffffff';
+
+    const resultsDiv = document.getElementById('results-div');
+    let html = `<div class="ratings-elements">
+        <span id="bread-crumbs" class="scope-input" onclick=browseFolder()>[All folders]</span>
+        <select id="media-type-filter" name="media_type" class="ratings-select">
+            <option value="video,audio">Video & Audio</option>
+            <option value="video">Video Only</option>
+            <option value="audio">Audio Only</option>
+        </select>
+        <select id="sort-order" name="sort_order" class="ratings-select">
+            <option value="ASC">Ascending</option>
+            <option value="DESC">Descending</option>
+        </select>
+        <button onclick="getRatings()" class="get-ratings-button">Get Ratings</button>
+    </div>
+    <div id='transcript-conf-ratings' class="ratings-elements"></div>
+    <div id="folder-browser" class='folder-browser-hidden'>`;
+    resultsDiv.innerHTML = html;
+
+    getRatings();
+    setCookie('Reports.activeTab', 'Transcript Ratings');
+}
+
+function getRatings() {
+    const pathName = document.getElementById('bread-crumbs').innerHTML;
+    const sortOrder = document.getElementById('sort-order').value;
+    const mediaType = document.getElementById('media-type-filter').value;
+
+    const scope = pathName.toLowerCase() == '[all folders]' ? '/' : pathName;
+
+    const csrftoken = getCookie('csrftoken');
+    fetch('/api/get-transcript-ratings/', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Max-Rows': maxRows,
+            'Scope': scope,
+            'Start-From': 0,
+            'Sort-Order': sortOrder,
+            'Media-Type': mediaType
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.log(data.error);
+        } else {
+            displayRatings(data.results);
+        }
+    })
+    .catch(error => {
+        alert('Unable to save data. Error:', error);
+    });
+}
+
+function displayRatings(results) {
+    const ratings = document.getElementById('transcript-conf-ratings');
+    if (results.length === 0) {
+        ratings.innerHTML = `<table class='results-table'><tr><td>No records found.</td></tr></table>`;
+        return;
+    }
+
+    let html = `<table class='results-table'><tr><th>No.</th><th>ID</th><th>Name</th><th>Path</th>
+        <th>Subject</th><th>Length</th><th>Chars</th><th>Words</th><th>Sentences</th><th>Rating</th>
+        <th>Remarks</th><th>Ratings By Segment</th></tr>`;
+    counter = 1;
+    results.forEach(item => {
+        attributes = JSON.parse(item.attributes);
+        stats = JSON.parse(item.transcript_stats);
+        rating = stats['rating'];
+        html += `<tr>
+            <td>${counter}</td>
+            <td>${item.file_id}</td>
+            <td><span class='clickable-text' ondblclick=openMediaPlayer(${item.file_id})>${item.file_name}<span></td>
+            <td>${item.path_name}</td>
+            <td>${item.subject || ''}</td>
+            <td>${formatTime(attributes['length'])}</td>
+            <td>${stats['chars']}</td>
+            <td>${stats['words']}</td>
+            <td>${stats['sentences']}</td>
+            <td>${rating ? (100*rating).toFixed(2) : "N/A"}</td>
+            <td>${item.remarks}</td>
+            <td id='segment-td-${item.file_id}'>
+                <button id='segment-rating-${item.file_id}' 
+                onclick=showRatingsBySegment(${item.file_id},${attributes['length']})>
+                Show</button></td>
+            </tr>`;
+        counter += 1;
+    });
+    html += '</table>';
+    ratings.innerHTML = html;
+}
+
+function openMediaPlayer(file_id) {
+    window.open(
+        "/app/media-player/?file_id=" + file_id + "&file_name=video",
+        "_blank"
+    );
+}
+
+function showRatingsBySegment(file_id, asset_len) {
+
+    function displayRatingsBySegment(segments) {
+        const td = document.getElementById(`segment-td-${file_id}`);
+        let html = '<table><tr>';
+        segments.forEach(segment => {
+            const color = ratingToColor(segment.confidence);
+            const width = 100.0 * (segment.time_end - segment.time_start) / asset_len;
+            html += `<td style='background-color:${color}; width:${width}%;'></td>`;
+        });
+        html += '</tr></table>';
+        td.innerHTML = html;
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-chunk-ratings/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.log(data.error);
+        } else {
+            displayRatingsBySegment(data.results);
+        }
+    })
+    .catch(error => {
+        console.log(error);
+        alert('Unable to save data. Error:', error);
+    });
+}
+
+function browseFolder(parent_id = 1) {
+    function fetchFolders(parent_id = 1) {
+        const csrftoken = getCookie("csrftoken");
+        return fetch(`/api/get-folders/${parent_id}/`, {
+            method: "GET",
+            headers: {
+                "Subscription-ID": SUBSCRIPTION_ID,
+                "Client-Secret": CLIENT_SECRET,
+                "Parent-ID": parent_id,
+                "Max-Rows": maxRows,
+                "X-CSRFToken": csrftoken,
+            },
+        }).then((response) => response.json());
+    }
+
+    function createFolderElement(tree, folder) {
+        const row = document.createElement("tr");
+        const col = document.createElement("td");
+        const icon = document.createElement("span");
+        const label = document.createElement("span");
+        row.appendChild(col);
+        col.appendChild(icon);
+        col.appendChild(label);
+        icon.innerHTML = FOLDER_ICON;
+        icon.style.paddingLeft = folder.folder_level * FOLDER_WIDTH + "px";
+        icon.setAttribute("folder_id", folder.folder_id);
+        icon.classList.add("folder-icon");
+        label.innerHTML = folder.name;
+        label.setAttribute("folder_id", folder.folder_id);
+        label.classList.add("browse-folder-label");
+
+        // Handle folder double-click to load subfolders
+        icon.addEventListener("dblclick", function (event) {
+            let lastRow = row;
+            fetchFolders(folder.folder_id).then((subfolders) => {
+                if (subfolders.results.length) {
+                    subfolders.results.forEach((subfolder) => {
+                        const newRow = createFolderElement(tree, subfolder);
+                        tree.insertBefore(newRow, lastRow.nextSibling);
+                        lastRow = newRow;
+                    });
+                }
+            });
+        });
+
+        // Handle folder click to select the folder
+        label.addEventListener("click", function (event) {
+            folder["path_name"] = folder.path + folder.name;
+            selectFolder(folder);
+        });
+
+        return row;
+    }
+
+    function createRootFolder() {
+        const table = document.createElement("table");
+        const row = document.createElement("tr");
+        const col = document.createElement("td");
+        const icon = document.createElement("span");
+        const label = document.createElement("span");
+        row.appendChild(col);
+        col.appendChild(icon);
+        col.appendChild(label);
+        table.appendChild(row);
+        table.id = "folder-tree";
+        icon.style.paddingLeft = "0px";
+        icon.innerHTML = FOLDER_ICON;
+        icon.setAttribute("folder_id", 1);
+        icon.classList.add("folder-icon");
+        label.innerHTML = "[all folders]";
+        label.setAttribute("folder_id", 1);
+        label.classList.add("browse-folder-label");
+
+        // Handle folder click to select the folder
+        label.addEventListener("click", function (event) {
+            let folder = {
+                folder_id: 1,
+                path: "",
+                name: "[All folders]",
+                path_name: "/",
+                folder_level: 0,
+            };
+            selectFolder(folder);
+        });
+
+        return table;
+    }
+
+    fetchFolders(parent_id)
+    .then((folders) => {
+        const folderBrowser = document.getElementById("folder-browser");
+        folderBrowser.innerHTML = "";
+        const rootFolder = createRootFolder();
+        folderBrowser.appendChild(rootFolder);
+
+        folders.results.forEach((folder) => {
+            rootFolder.appendChild(createFolderElement(rootFolder, folder));
+        });
+
+        folderBrowser.classList.remove("folder-browser-hidden");
+        folderBrowser.classList.add("folder-browser-visible");
+
+        const breadCrumbs = document.getElementById("bread-crumbs");
+        const rect = breadCrumbs.getBoundingClientRect();
+        folderBrowser.style.top = rect.y + rect.height + "px";
+        folderBrowser.style.left = rect.x + "px";
+    })
+    .catch((error) => {
+      console.log(error);
+      alert("An error occurred while fetching folders.");
+    });
+}
+
+function selectFolder(folder) {
+    const folderBrowser = document.getElementById("folder-browser");
+    if (folderBrowser.classList.contains("folder-browser-visible")) {
+        folderBrowser.classList.remove("folder-browser-visible");
+        folderBrowser.classList.add("folder-browser-hidden");
+    }
+
+    const breadCrumbs = document.getElementById("bread-crumbs");
+    breadCrumbs.innerHTML = folder.path + folder.name;
+}
+
