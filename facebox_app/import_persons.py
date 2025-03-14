@@ -44,7 +44,12 @@ def import_from_json(conn, input_path):
         face_vector = record['face']
         query = f"SELECT face_id FROM mbox_face WHERE person_uuid = %s ORDER BY embedding <=> %s::vector LIMIT 1"
         cursor.execute(query, (person_uuid, face_vector))
-        face_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        if result is None:
+            print(f"{person_uuid} not found in mbox_face table.")
+            continue
+
+        face_id = result[0]
         record['face_id'] = face_id
             
         # Get the column names and values

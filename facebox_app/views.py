@@ -140,7 +140,8 @@ def search_face(request):
                 WHERE (embedding <=> %s::vector) <= (1.0 - %s) AND
                     ff.person_id = fp.person_id AND 
                     ff.file_id = fl.file_id AND
-                    ff.merged_to IS NULL 
+                    ff.merged_to IS NULL AND
+                    (ff.quality->>'Sharpness')::FLOAT8 > 50.0
             """
         else:
             query += f"""
@@ -148,7 +149,8 @@ def search_face(request):
                     ff.person_id = fp.person_id AND 
                     ff.file_id = fl.file_id AND
                     ff.file_id <> {last_face_id} AND
-                    ff.merged_to IS NULL 
+                    ff.merged_to IS NULL AND
+                    (ff.quality->>'Sharpness')::FLOAT8 > 50.0
             """
         if video_list is not None and video_list != "0":
             query += f"AND ff.file_id in ({video_list}) "
@@ -1087,6 +1089,7 @@ def search_person(request):
                 AND ff.file_id = fl.file_id 
                 AND fp.person_id > %s 
                 AND ff.merged_to IS NULL
+                AND (ff.quality->>'Sharpness')::FLOAT8 > 50.0
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
@@ -1110,6 +1113,7 @@ def search_person(request):
                 AND ff.file_id IN (%s)
                 AND fp.person_id > %s 
                 AND ff.merged_to IS NULL
+                AND (ff.quality->>'Sharpness')::FLOAT8 > 50.0
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id

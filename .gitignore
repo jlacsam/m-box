@@ -24,6 +24,9 @@ env/
 staticfiles/
 media/
 uploads/
+logs/
+models/
+thumbnails/
 
 # VSCode settings
 .vscode/

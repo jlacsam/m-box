@@ -363,16 +363,16 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
     print(f"Folder group of {folder} is {'updated' if affected else 'unchanged'}.")
 
     # Load file uris, attribs, metadata and stats
-    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.uri"
+    filename = os.path.join(data_dir, f"{container}__{folder}.uri")
     uris_dict = load_uris(filename)
 
-    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.csv"
+    filename = os.path.join(data_dir, f"{container}__{folder}.csv")
     metadata_dict = load_metadata(filename)
 
-    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.attribs"
+    filename = os.path.join(data_dir, f"{container}__{folder}.attribs")
     attribs_dict = load_attributes(filename)
 
-    filename = f"{data_dir}/{container}/{folder}/{container}__{folder}.stats"
+    filename = os.path.join(data_dir, f"{container}__{folder}.stats")
     stats_dict = load_stats(filename)
 
     # The number of records for the above sources must match.
@@ -422,31 +422,31 @@ def upload_to_db(conn, data_dir, container, folder, owner_name="admin", group_na
             media_type = record[3]
 
         # Read contents of .syn file
-        syn_file_path = os.path.join(captions_dir, f"{basename}.syn")
+        syn_file_path = os.path.join(data_dir, f"{basename}.syn")
         with open(syn_file_path, 'r', encoding='utf-8') as syn_file:
             syn_content = syn_file.read()
 
         # Read contents of .vtt file
-        vtt_file_path = os.path.join(captions_dir, f"{basename}.vtt")
+        vtt_file_path = os.path.join(data_dir, f"{basename}.vtt")
         with open(vtt_file_path, 'r', encoding='utf-8') as vtt_file:
             vtt_content = vtt_file.read()
 
         # Read contents of .pp file
-        pp_file_path = os.path.join(captions_dir, f"{basename}.pp")
+        pp_file_path = os.path.join(data_dir, f"{basename}.pp")
         with open(pp_file_path, 'r', encoding='utf-8') as pp_file:
             pp_content = json.load(pp_file)
             people = pp_content['people']
             places = pp_content['places']
 
         # Read contents of .emb file
-        emb_file_path = os.path.join(captions_dir, f"{basename}.emb")
+        emb_file_path = os.path.join(data_dir, f"{basename}.emb")
         with open(emb_file_path, 'r', encoding='utf-8') as emb_file:
             emb_content = json.load(emb_file)
             chunks = emb_content.get('chunks',[])
 
         # Read the contents of the .offsets file
         if media_type == 'video':
-            off_file_path = os.path.join(captions_dir, f"{basename}.offsets")
+            off_file_path = os.path.join(data_dir, f"{basename}.offsets")
             with open(off_file_path, 'r', encoding='utf-8') as off_file:
                 offsets = json.load(off_file)
 
