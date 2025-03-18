@@ -14,7 +14,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers, update_text_embedding
+from urllib.parse import urlparse
+from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers, update_text_embedding, upload_to_storage
 from .models import MboxFile, MboxFolder, MboxPerson
 
 
@@ -719,18 +720,27 @@ def get_presigned_url(request, file_id, for_streaming=True):
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         region_name=settings.AWS_DEFAULT_REGION
     )
-    
+
     try:
         # Get file object from database
         file = MboxFile.objects.get(file_id=file_id)
-        
+
+        # Get storage bucket name and storage key
+        if "://" in file.storage_key:
+            parsed_url = urlparse(file.storage_key)
+            bucket_name = parsed_url.netloc
+            storage_key = parsed_url.path.lstrip('/')
+        else:
+            bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+            storage_key = file.storage_key
+
         # Generate presigned URL with 24-hour expiration
-        target = "inline" if for_streaming else f"attachment; filename={file['name']}"
+        target = "inline" if for_streaming else f"attachment; filename={file.name}"
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={
-                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                'Key': file.storage_key,
+                'Bucket': bucket_name,
+                'Key': storage_key,
                 'ResponseContentDisposition': target,
             },
             ExpiresIn=settings.MBOX_URL_EXPIRATION # in seconds
@@ -907,6 +917,7 @@ def upload_file(request,folder_id):
 
     try:
         filename = default_storage.save(path_file, uploaded_file)
+        full_path = os.path.join(settings.MEDIA_ROOT, filename)
     except Exception as e:
         return Response({'error':f'{e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -933,8 +944,12 @@ def upload_file(request,folder_id):
             status='NEW'
         )
         file.save() # This should somehow trigger an event that will start the AI processing
+
     except Exception as e:
         return Response({'error':f'{e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # Upload the temporary file to the permanent storage
+    upload_to_storage(file.file_id, full_path)
 
     return Response({'result':'success','file_id':f'{file.file_id}'}, status=status.HTTP_200_OK)
 

@@ -15,6 +15,7 @@ urlpatterns = [
     path('videos/', views.video_search, name='video_search'),
     path('photos/', views.photo_search, name='photo_search'),
     path('audios/', views.audio_search, name='audio_search'),
+    path('docs/', views.doc_search, name='doc_search'),
     path('media-player/', views.media_player, name='media_player'),
     path('photo-viewer/', views.photo_viewer, name='photo_viewer'),
     path('library/', views.library_viewer, name='library_viewer'),

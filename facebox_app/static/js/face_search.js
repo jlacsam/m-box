@@ -488,9 +488,6 @@ function unLinkFaces(person_id, unlinkPerson) {
     });
 }
 
-
-
-
 function displayGroups(groups) {
   const userGroups = document.getElementById("user-groups");
   let html = `<p class='groups-label'>Groups</p>`;
@@ -885,9 +882,9 @@ function displayPersonTiles(data, append = false) {
   const items = data.results;
   items.forEach((item) => {
     const confidence = item.confidence.toFixed(2);
-    const box = JSON.stringify(item.box)
-      .replaceAll("\\", "")
-      .replaceAll('"', "");
+    const box = JSON.stringify(JSON.parse(item.box), null, 2).replace(/"(\w+)":/g, '$1:');
+    const quality = JSON.stringify(formatJsonNumbers(JSON.parse(item.quality),1), null, 2)
+		  .replace(/"(\w+)":/g, '$1:');
     const tile = `
         <div class="tile">
           <table class="tile_table">
@@ -964,6 +961,12 @@ function displayPersonTiles(data, append = false) {
                     <td>
                       <div class="field_label">Bounding box</div>
                       <div class="field_value">${box}</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="field_label">Image Quality</div>
+                      <div class="field_value">${quality}</div>
                     </td>
                   </tr>
                 </table>

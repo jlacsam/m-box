@@ -170,6 +170,10 @@ if not LOG_SIZE:
 else:
     LOG_SIZE = int(LOG_SIZE)
 
+BLOB_STORAGE = os.environ.get('MBOX_BLOB_STORAGE')
+if not BLOB_STORAGE:
+    BLOB_STORAGE = '/mbox/blobs/'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
@@ -223,7 +227,10 @@ MBOX_EDITORS_GROUP = os.environ.get('MBOX_EDITORS_GROUP')
 MBOX_SUPERVISORS_GROUP = os.environ.get('MBOX_SUPERVISORS_GROUP')
 MBOX_DEVELOPERS_GROUP = os.environ.get('MBOX_DEVELOPERS_GROUP')
 MBOX_URL_EXPIRATION = os.environ.get('MBOX_URL_EXPIRATION')
+MAX_FILES_PER_STORAGE_BUCKET = os.environ.get('MBOX_MAX_FILES_PER_STORAGE_BUCKET')
 REST_USE_JWT = True
+DELETE_LOCAL_FILE_AFTER_UPLOAD = True
+TARGET_STORAGE = os.environ.get('MBOX_TARGET_STORAGE')
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/app/videos/'

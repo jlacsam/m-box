@@ -554,6 +554,8 @@ function displayResults(results) {
             html += `<td>${FOLDER_ICON}</td>`;
         } else if (item.media_type == 'audio') {
             html += `<td>${AUDIO_ICON}</td>`;
+        } else if (item.media_type == 'document') {
+            html += `<td>${FILE_ICON}</td>`;
         } else {
             html += `
             <td><img class="thumbnail thumbnail_tab" id="thumbnail_${item.file_id}" 
@@ -614,8 +616,9 @@ document.getElementById("toggleViewBtn").addEventListener("click", function () {
 
 function displayThumbnails(results) {
     const csrftoken = getCookie("csrftoken");
+    const NOTHUMBS = ['FOLDER','audio','document'];
     results.forEach((item) => {
-        if (item.extension == 'FOLDER' || item.media_type == 'audio') {
+        if (NOTHUMBS.includes(item.media_type)) {
             return;
         }
         fetch(`/api/get-thumbnail/${item.file_id}/`, {
@@ -1688,11 +1691,11 @@ function displayAsset(file_id, filename, type, source) {
         assetElement = document.createElement('audio');
         assetElement.src = source;
         assetElement.controls = true;
-    } else if (type === 'pdf') {
+    } else if (type === 'document') {
         assetElement = document.createElement('iframe');
         assetElement.src = source;
         assetElement.style.width = "100%";
-        assetElement.style.height = "500px";
+        assetElement.style.height = "100%";
     }
     mediaContainer.appendChild(assetElement);
 

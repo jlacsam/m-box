@@ -6,9 +6,9 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 
-CONFIDENCE_TOL = 99.0
+CONFIDENCE_TOL = 70.0
 SHARPNESS_TOL = 50.0
-MIN_FACE_SIZE = 900 # pixels
+MIN_FACE_SIZE = 800 # pixels
 MAX_FACE_ASPECT_RATIO = 2 # A face must be 2 units taller than wider
 
 def setup_logger(log_dir, module_name, log_file, log_size=10*1024*1024, backup_count=10):
@@ -139,11 +139,22 @@ def store_faces(conn, video_id, results, thumbnail_id):
     blob_offset = results['BlobOffset']
 
     count = 0
+    skipped_low_conf = 0
+    skipped_low_sharp = 0
+    skipped_too_small = 0
+    skipped_bad_shape = 0
     
     faces = results['Faces']
     for face in faces:
-        confidence = float(face['Face']['Confidence'])
+        confidence = 100.0 * float(face['Face']['Confidence'])
+        if confidence < CONFIDENCE_TOL:
+            skipped_low_conf += 1
+            continue
+
         sharpness = float(face['Face']['Quality']['Sharpness'])
+        if sharpness < SHARPNESS_TOL:
+            skipped_low_sharp += 1
+            continue
 
         bounding_box = face['Face']['BoundingBox']
         box_w = int(float(bounding_box['Width']) * width)
@@ -154,6 +165,15 @@ def store_faces(conn, video_id, results, thumbnail_id):
         bounding_box['Height'] = box_h
         bounding_box['Left'] = box_x
         bounding_box['Top'] = box_y
+
+        if box_w * box_h < MIN_FACE_SIZE:
+            skipped_too_small += 1
+            continue
+
+        aspect_ratio = max(box_w / box_h, box_h / box_w)
+        if aspect_ratio > MAX_FACE_ASPECT_RATIO:
+            skipped_bad_shape += 1
+            continue
 
         time_start = float(face['Timestamp'])/1000.0
         time_end = time_start + 1.0/framerate
@@ -179,7 +199,7 @@ def store_faces(conn, video_id, results, thumbnail_id):
         count = count + 1
 
     cursor.close()
-    return count
+    return count, skipped_low_conf, skipped_low_sharp, skipped_too_small, skipped_bad_shape
 
 
 def save_faces(conn, input_dir, bucket_name, folder_name):
@@ -204,6 +224,10 @@ def save_faces(conn, input_dir, bucket_name, folder_name):
 
     video_count = 0
     face_count = 0
+    skipped_count_low_conf = 0
+    skipped_count_low_sharp = 0
+    skipped_count_too_small = 0
+    skipped_count_bad_shape = 0
 
     for filename in os.listdir(input_dir):
         if not filename.endswith(".faces"):
@@ -245,13 +269,17 @@ def save_faces(conn, input_dir, bucket_name, folder_name):
             logger.error(f"{bucket_name}_{folder_name}__faces.dat not found.")
             continue
 
-        processed = store_faces(conn, video_id, faces, thumbnail_id)
+        processed, skipped_low_conf, skipped_low_sharp, skipped_too_small, skipped_bad_shape = store_faces(conn, video_id, faces, thumbnail_id)
         face_count += processed
+        skipped_count_low_conf += skipped_low_conf
+        skipped_count_low_sharp += skipped_low_sharp
+        skipped_count_too_small += skipped_too_small
+        skipped_count_bad_shape += skipped_bad_shape
 
-        logger.info(f"{bucket_name}/{folder_name}/{filename}: {processed} faces saved.")
+        logger.info(f"{bucket_name}/{folder_name}/{filename}: {processed} faces saved; {skipped_low_conf} low confidence; {skipped_low_sharp} blurry; {skipped_too_small} too small; {skipped_bad_shape} bad shape.")
 
     logger.info(f"{video_count} files processed.")
-    logger.info(f"{face_count} processed.")
+    logger.info(f"{face_count} processed, skipped: CONF:{skipped_count_low_conf}, SHARP:{skipped_count_low_sharp}, TOO SMALL:{skipped_count_too_small}, BAD SHAPE:{skipped_count_bad_shape}.")
 
 
 if __name__ == "__main__":

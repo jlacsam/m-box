@@ -3,6 +3,8 @@ import numpy as np
 import librosa
 import io
 import configparser
+import boto3
+import magic
 
 from functools import wraps
 from keras_facenet import FaceNet
@@ -14,6 +16,7 @@ from .models import MboxFile, MboxFolder, MboxAudit
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.conf import settings
 
 from rest_framework.response import Response
 from rest_framework import status
@@ -472,4 +475,118 @@ def update_text_embedding(file_id, source, time_range, new_text, old_text=None):
         with connection.cursor() as cursor:
             cursor.execute(query, (new_chunk, embedding.tolist(), chunk_id))
             return cursor.rowcount
+
+# Upload temporary file from temporary storage to permanent storage ################################
+def upload_to_storage(file_id, temp_file):
+
+    # TO DO: Implement some kind of queuing and upload files asynchronously
+
+    target = settings.TARGET_STORAGE
+    if target == 's3':
+        upload_to_s3(file_id, temp_file)
+    elif target == 'azure':
+        upload_to_azure(file_id, temp_file)
+    elif target == 'local':
+        upload_to_local(file_id, temp_file)
+    else:
+        upload_to_local(file_id, temp_file)
+
+# Upload temporary file to S3 ######################################################################
+def upload_to_s3(file_id, temp_file):
+    try:
+        # Get the file record
+        file_obj = get_object_or_404(MboxFile, file_id=file_id)
+
+        # Configure S3 client
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_DEFAULT_REGION
+        )
+
+        # Upload to S3
+        max_files = int(getattr(settings, 'MAX_FILES_PER_STORAGE_BUCKET', 1000))
+        bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+        folder = f'{(file_id // max_files):04X}'
+        file_name = f'{file_id:08X}__{file_obj.name}'
+        storage_key = f'{folder}/{file_name}'
+
+        mime = magic.Magic(mime=True)
+        content_type = mime.from_file(temp_file)
+        s3_client.upload_file(temp_file, bucket_name, storage_key, ExtraArgs={ 'ContentType': content_type })
+
+        # Update record with S3 info
+        file_obj.storage_key = 's3://' + bucket_name + '/' + storage_key
+        file_obj.status = 'uploaded'
+        file_obj.save()
+
+        # Optionally remove the local file
+        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+            os.remove(temp_file)
+
+    except Exception as e:
+        # Handle error
+        if file_obj:
+            file_obj.status = 'failed'
+            file_obj.error_message = str(e)
+            file_obj.save()
+
+# Upload temporary file to Azure Blob Storage ######################################################
+def upload_to_azure(file_id, temp_file):
+    print('This function is not yet implemented.')
+
+# Upload temporary file to Local Storage ###########################################################
+def upload_to_local(file_id, temp_file):
+    try:
+        # Get the file size
+        file_size = os.get_size(temp_file)
+
+        # Get the storage blob that is least full.
+        query = """
+            SELECT blob_id, blob_path, (capacity-used) AS remaining 
+            FROM mbox_blob 
+            WHERE remaining > 0 
+            ORDER BY remaining DESC
+            LIMIT 1
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            blob = cursor.fetchone()
+
+        # If there is no such storage, create a new one
+        if blob is None:
+            label = f'BLOB{int(time.time()):08X}'
+            path = os.path.join(settings.BLOB_STORAGE, f'{label}.dat')
+            query = "INSERT INTO mbox_blob (label,path) VALUES (%s,%s) RETURNING blob_id"
+            with connection.cursor() as cursor:
+                cursor.execute(query, (label, path))
+                blob_id = cursor.fetchone()[0]
+        else:
+            blob_id = blob[0]
+            path = blob[1]
+
+        # Append the file to that new storage
+        with open(temp_file, "rb") as infile:
+            with open(path, "ab") as outfile:
+                outfile.write(infile.read())
+                offset = outfile.tell()
+
+        # Store the offset in the file table
+        file_obj = MboxFile.objects.get(file_id=file_id)
+        file_obj.blob_offset = offset
+        file_obj.status = 'uploaded'
+        file_obj.save()
+
+        # Optionally remove the local file
+        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+            os.remove(temp_file)
+
+    except Exception as e:
+        # Handle error
+        if file_obj:
+            file_obj.status = 'failed'
+            file_obj.error_message = str(e)
+            file_obj.save()
+
 

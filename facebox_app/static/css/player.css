@@ -638,6 +638,10 @@ audio {
     width: 65%;
 }
 
+#video-player {
+    max-width: 1024px;
+}
+
 .video-filler {
     height: 480px;
 }

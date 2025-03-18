@@ -27,6 +27,7 @@ uploads/
 logs/
 models/
 thumbnails/
+blobs/
 
 # VSCode settings
 .vscode/

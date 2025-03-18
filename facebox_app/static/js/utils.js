@@ -204,6 +204,17 @@ function formatGMTToLocal(dateString) {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
 }
 
+function formatJsonNumbers(jsonData, places) {
+  return Object.fromEntries(
+    Object.entries(jsonData).map(([key, value]) => {
+      if (typeof value === "number" && !isNaN(value)) {
+        return [key, Number(value.toFixed(places))];
+      }
+      return [key, value]; // Leave non-numeric values unchanged
+    })
+  );
+}
+
 function formatJsonString(jsonString) {
   function syntaxHighlight(json) {
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -286,6 +297,15 @@ function goToPhotos(file_id,file_name) {
 
 function goToAudios(file_id,file_name) {
     href = "/app/audios/";
+    if (file_id != null && file_name != null) {
+        file_name = encodeURIComponent(file_name);
+        href += '?file_id=' + file_id + '&file_name=' + file_name;
+    }
+    window.location.href = href;
+}
+
+function goToDocs(file_id,file_name) {
+    href = "/app/docs/";
     if (file_id != null && file_name != null) {
         file_name = encodeURIComponent(file_name);
         href += '?file_id=' + file_id + '&file_name=' + file_name;
@@ -497,8 +517,9 @@ function sanitizeHtml(str) {
     '"': '&quot;',
     "'": '&#039;',
   };
-  
-  return str.replace(/[&<>"']/g, function(m) { return map[m]; }).trim();
+ 
+  if (str) return str.replace(/[&<>"']/g, function(m) { return map[m]; }).trim();
+  else return '';
 }
 
 function sanitizeJson(str) {

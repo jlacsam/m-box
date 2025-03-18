@@ -104,11 +104,18 @@ def search_face(request):
     max_rows = request.headers.get('Max-Rows')
     video_list = request.headers.get('Video-List')
     start_from = request.headers.get('Start-From')
+    sharpness_tol = request.headers.get('Sharpness-Tol')
+    head_turn_tol = request.headers.get('Pose-Yaw-Tol')
    
     # Check if an image is provided
     if 'image' not in request.FILES:
         return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
     
+    if sharpness_tol is None:
+        sharpness_tol = 100.0
+    if head_turn_tol is None:
+        head_turn_tol = 45.0
+
     image = request.FILES['image'].read()
 
     try:
@@ -141,7 +148,8 @@ def search_face(request):
                     ff.person_id = fp.person_id AND 
                     ff.file_id = fl.file_id AND
                     ff.merged_to IS NULL AND
-                    (ff.quality->>'Sharpness')::FLOAT8 > 50.0
+                    (ff.quality->>'Sharpness')::FLOAT > %s AND
+                    ABS((ff.pose->>'Yaw')::FLOAT) < %s
             """
         else:
             query += f"""
@@ -150,7 +158,8 @@ def search_face(request):
                     ff.file_id = fl.file_id AND
                     ff.file_id <> {last_face_id} AND
                     ff.merged_to IS NULL AND
-                    (ff.quality->>'Sharpness')::FLOAT8 > 50.0
+                    (ff.quality->>'Sharpness')::FLOAT > %s AND
+                    ABS((ff.pose->>'Yaw')::FLOAT) < %s
             """
         if video_list is not None and video_list != "0":
             query += f"AND ff.file_id in ({video_list}) "
@@ -159,7 +168,8 @@ def search_face(request):
             LIMIT %s
         """
 
-        cursor.execute(query, (embedding.tolist(),embedding.tolist(),similarity,max_rows))
+        cursor.execute(query, (embedding.tolist(),embedding.tolist(),similarity,
+                               sharpness_tol,head_turn_tol,max_rows))
         rows = cursor.fetchall()
 
     # Close database connection
@@ -1067,11 +1077,18 @@ def search_person(request):
     video_list = request.headers.get('Video-List')
     max_rows = request.headers.get('Max-Rows')
     start_from = request.headers.get('Start-From')
+    sharpness_tol = request.headers.get('Sharpness-Tol')
+    head_turn_tol = request.headers.get('Pose-Yaw-Tol')
 
     last_person_id = 0
     if start_from is not None:
         json_start_from = json.loads(start_from)
         last_person_id = json_start_from['person_id']
+
+    if sharpness_tol is None:
+        sharpness_tol = 100.0
+    if head_turn_tol is None:
+        head_turn_tol = 45.0
 
     # Search for matching records in the database
     labels = ['person_id', 'full_name', 'last_name', 'first_name', 'middle_name', 'birth_country', 'birth_city',
@@ -1089,7 +1106,8 @@ def search_person(request):
                 AND ff.file_id = fl.file_id 
                 AND fp.person_id > %s 
                 AND ff.merged_to IS NULL
-                AND (ff.quality->>'Sharpness')::FLOAT8 > 50.0
+                AND (fp.quality->>'Sharpness')::FLOAT > %s
+                AND ABS((fp.pose->>'Yaw')::FLOAT) < %s
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
@@ -1097,7 +1115,7 @@ def search_person(request):
             LIMIT %s
         """
         with connection.cursor() as cursor:
-            params = (last_person_id, max_rows)
+            params = (last_person_id, sharpness_tol, head_turn_tol, max_rows)
             cursor.execute(query, params)
             rows = cursor.fetchall()
 
@@ -1113,7 +1131,8 @@ def search_person(request):
                 AND ff.file_id IN (%s)
                 AND fp.person_id > %s 
                 AND ff.merged_to IS NULL
-                AND (ff.quality->>'Sharpness')::FLOAT8 > 50.0
+                AND (fp.quality->>'Sharpness')::FLOAT > %s
+                AND ABS((fp.pose->>'Yaw')::FLOAT) < %s
             GROUP BY fp.person_id, fp.full_name, fp.last_name, fp.first_name, fp.middle_name, fp.birth_country, 
                 fp.birth_city, fp.birth_date, fp.box, fp.pose, fp.quality, fp.gender, fp.age_range, 
                 fp.confidence, fp.face_id, fl.name, fl.file_url, fl.file_id
@@ -1122,7 +1141,7 @@ def search_person(request):
         """
 
         with connection.cursor() as cursor:
-            params = (video_list, last_person_id, max_rows)
+            params = (video_list, last_person_id, sharpness_tol, head_turn_tol, max_rows)
             cursor.execute(query, params)
             rows = cursor.fetchall()
 
@@ -1492,6 +1511,18 @@ def audio_search(request):
         'allow_edit': is_editor,
     }
     return render(request, 'audio_search.html', context);
+
+@login_required
+def doc_search(request):
+    groups = request.user.groups.all()
+    is_editor = groups.filter(name=settings.MBOX_EDITORS_GROUP).exists()
+    context = { 
+        'file_id':request.GET.get('file_id','0'), 
+        'file_name':request.GET.get('file_name',''),
+        'username':request.user.first_name,
+        'allow_edit': is_editor,
+    }
+    return render(request, 'doc_search.html', context);
 
 @login_required
 def face_search(request):

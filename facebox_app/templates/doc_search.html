@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AudioBox</title>
+    <title>VideoBox</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     <link rel="stylesheet" href="{% static 'css/datatables.min.css' %}">
@@ -15,9 +15,9 @@
         <span class="title-bar"><table id="title-bar"><tr>
             <td><table id="menu-bar"><tr>
                 <td id="videos-tab" onclick="goToVideos()">Videos</td>
-                <td id="audios-tab">Audios</td>
+                <td id="audios-tab" onclick="goToAudios()">Audios</td>
                 <td id="photos-tab" onclick="goToPhotos()">Photos</td>
-                <td id="documents-tab" onclick="goToDocs()">Documents</td>
+                <td id="documents-tab">Documents</td>
                 <td id="faces-tab" onclick="goToFaces()">Faces</td>
                 <td id="voices-tab" onclick="goToVoices()">Voices</td>
                 <td id="menu-separator">&nbsp;</td>
@@ -49,7 +49,7 @@
 
     <div class="container">
         <div class="search-container">
-            <input id="search-box" type="search" class="search" placeholder="[Search audios]">
+            <input id="search-box" type="search" class="search" placeholder="[Search videos]">
             <p>&nbsp</p>
             <button id="search-button" class="button">Search</button>
             <button id="reset-button" class="button">Reset</button>
@@ -72,12 +72,13 @@
                 </label>
             </td>
         </tr></table>
-    </div>
+    </div> 
     <div id="results">
         <table id="results-table">
             <thead>
                 <tr>
                     <th>File ID</th>
+                    <th>Thumbnail</th>
                     <th>Title</th>
                     <th>Name</th>
                     <th>File Type</th>
@@ -89,6 +90,7 @@
                     <th>Tags</th>
                     <th>People</th>
                     <th>Places</th>
+                    <th>Texts</th>
                     <th>Last Accessed</th>
                     <th>Owner Name</th>
                     <th>Group Name</th>
@@ -113,12 +115,12 @@
             </tbody>
         </table>
     </div>
-    <div id="tiles-results-audio" style="display: none;"></div>
+    <div id="tiles-results" style="display: none;"></div>
 
     <div class="controls">
         <table><tr>
-             <td id="bottom-results-label">
-            </td> 
+            <td id="bottom-results-label">
+            </td>
             <td class="paging-buttons">
                 <button id="bottom-top-page" class="paging-button">Top</button>
                 <button id="bottom-prev-page" class="paging-button">Previous</button>
@@ -137,6 +139,6 @@
     </script>
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'js/datatables.min.js' %}"></script>
-    <script src="{% static 'js/audio_search.js' %}"></script>
+    <script src="{% static 'js/doc_search.js' %}"></script>
 </body>
 </html>

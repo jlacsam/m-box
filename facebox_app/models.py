@@ -201,6 +201,18 @@ class MboxThumbnail(models.Model):
         db_table = 'mbox_thumbnail'
 
 
+class MboxBlob(models.Model):
+    blob_id = models.AutoField(primary_key=True)
+    label = models.CharField(max_length=32)
+    path = models.CharField(max_length=255)
+    used = models.IntegerField()
+    capacity = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'mbox_blob'
+
+
 class MboxTranscript(models.Model):
     chunk_id = models.AutoField(primary_key=True)
     file = models.ForeignKey('MboxFile', models.DO_NOTHING)

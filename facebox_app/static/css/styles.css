@@ -496,7 +496,7 @@ ul li:hover {
   height: 100%;
 }
 
-#videos-tab, #photos-tab, #audios-tab, #faces-tab, 
+#videos-tab, #photos-tab, #audios-tab, #faces-tab, #documents-tab,
 #voices-tab, #library-tab, #reports-tab {
   color: #888888;
   width: 100%;
@@ -505,7 +505,7 @@ ul li:hover {
   padding-right: 10px;
 }
 
-#videos-tab:hover, #photos-tab:hover, #audios-tab:hover, #faces-tab:hover,
+#videos-tab:hover, #photos-tab:hover, #audios-tab:hover, #faces-tab:hover, #documents-tab:hover,
 #voices-tab:hover, #library-tab:hover, #reports-tab:hover {
   color: #00bbbb;
   cursor: pointer;

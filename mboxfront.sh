@@ -16,7 +16,7 @@ export AZURE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=ayala
 
 # AWS S3 Access
 export AWS_DEFAULT_REGION=ap-southeast-1
-export AWS_STORAGE_BUCKET_NAME=akmvideos
+export AWS_STORAGE_BUCKET_NAME='mbox-demo'
 export AWS_SECRET_ACCESS_KEY=+nR32MyjS12rZU+AxH4rAUnU/GVRwZ6beWZNPMqq
 export AWS_ACCESS_KEY_ID=AKIAT7JJVHN4LC6YDKXU
 
@@ -33,11 +33,8 @@ export MBOX_EDITORS_GROUP='editors'
 export MBOX_SUPERVISORS_GROUP='supervisors'
 export MBOX_DEVELOPERS_GROUP='developers'
 
-# MEDIA ROOT for file thumbnails and face thumbnails
-export MBOX_MEDIA_ROOT=/mbox/thumbnails
-
 # UPLOADS DIRECTORY for upload files via web interface
-# Specify a path that is relative to MEDIA_ROOT
+# MUST specify a path that is relative to MEDIA_ROOT
 export MBOX_UPLOADS_DIRECTORY='./uploads'
 
 # DATABASE
@@ -47,9 +44,10 @@ export MBOX_DB_PASS=password
 export MBOX_DB_HOST=localhost
 export MBOX_DB_PORT=5432
 
-# MEDIA STORAGE for thumbnails and log directory
+# MEDIA STORAGE for blobs, thumbnails and log directory
 export MBOX_MEDIA_ROOT='/home/jose/Workspaces/mbox/frontend/thumbnails/'
 export MBOX_LOG_DIRECTORY='/home/jose/Workspaces/mbox/frontend/logs/'
+export MBOX_BLOB_STORAGE='/home/jose/Workspaces/mbox/frontend/blobs/'
 
 # LOGGERS
 export MBOX_LOG_SIZE=67108864
@@ -63,3 +61,5 @@ export MBOX_APP_LOGLEVEL='INFO'
 export MBOX_DEBUG=True
 export MBOX_ALLOWED_HOSTS=localhost
 export MBOX_URL_EXPIRATION=86400
+export MBOX_MAX_FILES_PER_STORAGE_BUCKET=1000
+export MBOX_TARGET_STORAGE=s3

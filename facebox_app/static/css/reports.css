@@ -172,7 +172,8 @@ ul li:hover {
     height: 100%;
 }
 
-#videos-tab {
+#videos-tab, #audios-tab, #photos-tab, #documents-tab, #faces-tab, #voices-tab,
+#library-tab, #reports-tab {
     color: #888888;
     width: 100%;
     transition: color 0.3s ease;
@@ -180,59 +181,8 @@ ul li:hover {
     padding-right:10px;
 }
 
-#videos-tab:hover {
-    color: #00bbbb;
-    cursor: pointer;
-}
-
-#photos-tab {
-    color: #888888;
-    width: 100%;
-    transition: color 0.3s ease;
-    cursor: default;
-    padding-right:10px;
-}
-
-#photos-tab:hover {
-    color: #00bbbb;
-    cursor: pointer;
-}
-
-#audios-tab {
-    color: #888888;
-    width: 100%;
-    transition: color 0.3s ease;
-    cursor: default;
-    padding-right:10px;
-}
-
-#audios-tab:hover {
-    color: #00bbbb;
-    cursor: pointer;
-}
-
-#faces-tab {
-    color: #888888;
-    width: 100%;
-    transition: color 0.3s ease;
-    cursor: default;
-    padding-right:10px;
-}
-
-#faces-tab:hover {
-    color: #00bbbb;
-    cursor: pointer;
-}
-
-#voices-tab, #reports-tab, #library-tab {
-    color: #888888;
-    width: 100%;
-    transition: color 0.3s ease;
-    cursor: default;
-    padding-right:10px;
-}
-
-#voices-tab:hover, #reports-tab:hover, #library-tab:hover {
+#videos-tab:hover, #audios-tab:hover, #photos-tab:hover, #documents-tab:hover, #faces-tab:hover,
+#voices-tab:hover, #library-tab:hover, #reports-tab:hover {
     color: #00bbbb;
     cursor: pointer;
 }

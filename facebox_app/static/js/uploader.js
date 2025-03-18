@@ -65,10 +65,12 @@ class FileUploadModal {
     constructor(folder_id) {
         this.folder_id = folder_id;
         this.files = [];
+        this.folderStructure = {}; // For storing folder structure
         this.fileStatuses = {};
         this.uploading = false;
         this.totalBytes = 0;
         this.uploadedBytes = 0;
+        this.folderIdMap = {}; // Maps client-side folder paths to server-side folder IDs
         this.setupElements();
         this.setupEventListeners();
     }
@@ -97,6 +99,7 @@ class FileUploadModal {
             const input = document.createElement('input');
             input.type = 'file';
             input.multiple = true;
+            input.webkitdirectory = true; // Enable directory selection
             input.onchange = (e) => this.handleFileSelect(e.target.files);
             input.click();
         };
@@ -115,17 +118,156 @@ class FileUploadModal {
     handleDrop(e) {
         e.preventDefault();
         this.dropZone.classList.remove('dragover');
-        const files = e.dataTransfer.files;
-        this.handleFileSelect(files);
+        
+        // Get all items from the dataTransfer
+        const items = e.dataTransfer.items;
+        
+        if (items) {
+            // Process dropped items (files or directories)
+            this.processDataTransferItems(items);
+        } else {
+            // Fallback to regular file handling if DataTransferItemList is not supported
+            const files = e.dataTransfer.files;
+            this.handleFileSelect(files);
+        }
     }
 
-    handleFileSelect(fileList) {
-        const validFiles = this.validateFiles(fileList);
+    async processDataTransferItems(items) {
+        const validFiles = [];
+        this.folderStructure = {};
+        
+        // Function to process entries recursively
+        const processEntry = async (entry, path = '') => {
+            if (entry.isFile) {
+                const file = await this.getFileFromEntry(entry);
+                if (this.isValidFileType(file)) {
+                    // Store the file with its path information
+                    file.relativePath = path + file.name;
+                    file.folderPath = path;
+                    validFiles.push(file);
+                    
+                    // Update folder structure
+                    if (path) {
+                        let currentLevel = this.folderStructure;
+                        const folders = path.split('/').filter(f => f);
+                        
+                        folders.forEach((folder, index) => {
+                            if (!currentLevel[folder]) {
+                                currentLevel[folder] = { files: [], folders: {} };
+                            }
+                            
+                            if (index === folders.length - 1) {
+                                currentLevel[folder].files.push(file);
+                            } else {
+                                currentLevel = currentLevel[folder].folders;
+                            }
+                        });
+                    } else {
+                        // Root level file
+                        if (!this.folderStructure.files) {
+                            this.folderStructure.files = [];
+                        }
+                        this.folderStructure.files.push(file);
+                    }
+                }
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                const newPath = path + entry.name + '/';
+                
+                // Process all entries in the directory
+                let entries = [];
+                let readEntries = await this.readAllDirectoryEntries(dirReader);
+                while (readEntries.length > 0) {
+                    entries = entries.concat(readEntries);
+                    readEntries = await this.readAllDirectoryEntries(dirReader);
+                }
+                
+                // Process each entry
+                for (const childEntry of entries) {
+                    await processEntry(childEntry, newPath);
+                }
+            }
+        };
+        
+        // Process all the items
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file') {
+                const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : item.getAsEntry();
+                if (entry) {
+                    await processEntry(entry);
+                }
+            }
+        }
+        
         this.files = [...this.files, ...validFiles];
         this.updateFileList();
     }
 
-    validateFiles(fileList) {
+    async readAllDirectoryEntries(dirReader) {
+        return new Promise((resolve) => {
+            dirReader.readEntries(entries => {
+                resolve(entries);
+            });
+        });
+    }
+
+    async getFileFromEntry(fileEntry) {
+        return new Promise((resolve) => {
+            fileEntry.file(file => {
+                resolve(file);
+            });
+        });
+    }
+
+    handleFileSelect(fileList) {
+        // Process files from regular file input or from webkitdirectory
+        const validFiles = [];
+        this.folderStructure = this.folderStructure || {};
+        
+        Array.from(fileList).forEach(file => {
+            if (this.isValidFileType(file)) {
+                // Check if the file has a webkitRelativePath (directory selection)
+                if (file.webkitRelativePath) {
+                    const path = file.webkitRelativePath.split('/');
+                    file.relativePath = file.webkitRelativePath;
+                    file.folderPath = path.slice(0, -1).join('/') + '/';
+                    
+                    // Update folder structure
+                    let currentLevel = this.folderStructure;
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const folder = path[i];
+                        if (!currentLevel[folder]) {
+                            currentLevel[folder] = { files: [], folders: {} };
+                        }
+                        
+                        if (i === path.length - 2) {
+                            currentLevel[folder].files.push(file);
+                        } else {
+                            currentLevel = currentLevel[folder].folders;
+                        }
+                    }
+                } else {
+                    // Regular file (no directory)
+                    file.relativePath = file.name;
+                    file.folderPath = '';
+                    
+                    // Add to root files
+                    if (!this.folderStructure.files) {
+                        this.folderStructure.files = [];
+                    }
+                    this.folderStructure.files.push(file);
+                }
+                
+                validFiles.push(file);
+            }
+        });
+        
+        this.files = [...this.files, ...validFiles];
+        this.updateFileList();
+    }
+
+    isValidFileType(file) {
         const allowedExtensions = [
             '.mov', '.mp4', '.avi', '.webm', '.ogg', '.mkv', '.wmv', '.flv',
             '.aac', '.aiff', '.flac', '.m4a', '.mp3', '.raw', '.vox', '.wav', '.wma',
@@ -134,38 +276,48 @@ class FileUploadModal {
             '.ppt', '.pptx', '.odp'
         ];
 
-        const validFiles = [];
-        const invalidFiles = [];
-
-        Array.from(fileList).forEach(file => {
-            const ext = '.' + file.name.split('.').pop().toLowerCase();
-            if (allowedExtensions.includes(ext)) {
-                validFiles.push(file);
-            } else {
-                invalidFiles.push(file.name);
-            }
-        });
-
-        if (invalidFiles.length > 0) {
-            this.errorMessages.textContent = `Removed unsupported files: ${invalidFiles.join(', ')}`;
-        }
-
-        return validFiles;
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        return allowedExtensions.includes(ext);
     }
 
     updateFileList() {
         this.fileList.innerHTML = '';
         this.totalBytes = 0;
 
-        this.files.forEach((file, index) => {
+        // Group files by folders
+        const folderGroups = {};
+        this.files.forEach(file => {
+            const folderPath = file.folderPath || '';
+            if (!folderGroups[folderPath]) {
+                folderGroups[folderPath] = [];
+            }
+            folderGroups[folderPath].push(file);
             this.totalBytes += file.size;
-            const fileItem = document.createElement('div');
-            fileItem.className = 'file-item';
-            fileItem.innerHTML = `
-                <span>${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)</span>
-                <span class="file-status" data-file="${file.name}">0%</span>
-            `;
-            this.fileList.appendChild(fileItem);
+        });
+
+        // Create folder sections
+        Object.keys(folderGroups).sort().forEach(folderPath => {
+            if (folderPath) {
+                // Create folder header
+                const folderHeader = document.createElement('div');
+                folderHeader.className = 'folder-header';
+                folderHeader.innerHTML = `<span class="folder-icon">📁</span> ${folderPath}`;
+                this.fileList.appendChild(folderHeader);
+            }
+
+            // Add files in this folder
+            folderGroups[folderPath].forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                if (folderPath) {
+                    fileItem.classList.add('folder-file');
+                }
+                fileItem.innerHTML = `
+                    <span>${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                    <span class="file-status" data-file="${file.relativePath}">0%</span>
+                `;
+                this.fileList.appendChild(fileItem);
+            });
         });
 
         this.uploadButton.disabled = this.files.length === 0;
@@ -194,13 +346,20 @@ class FileUploadModal {
         this.uploadButton.disabled = true;
         this.uploadedBytes = 0;
         this.fileStatuses = {};
+        this.folderIdMap = {}; // Reset folder ID map
+        this.folderIdMap[''] = this.folder_id; // Root folder is the current folder
+        
         let successfulUploads = 0;
 
         const options = Array.from(checkedBoxes).map(cb => cb.id.replace('cb_',''));
 
-        // Upload files concurrently with a limit of 3 simultaneous uploads
+        // First, create all necessary folders
+        await this.createFolderStructure();
+
+        // Then upload files
         const results = await concurrentMap(this.files, async (file) => {
-            const success = await this.uploadFile(file, options);
+            const targetFolderId = this.folderIdMap[file.folderPath] || this.folder_id;
+            const success = await this.uploadFile(file, options, targetFolderId);
             if (success) successfulUploads++;
             return success;
         }, 3);
@@ -213,6 +372,76 @@ class FileUploadModal {
         if (successfulUploads === this.files.length) {
             this.uploadButton.textContent = 'Close';
             this.uploadButton.onclick = () => this.close();
+        }
+    }
+
+    async createFolderStructure() {
+        // Create a flattened list of folder paths
+        const folderPaths = new Set();
+        this.files.forEach(file => {
+            if (file.folderPath) {
+                // Split the path and create all parent folders
+                const pathParts = file.folderPath.split('/').filter(p => p);
+                let currentPath = '';
+                pathParts.forEach(part => {
+                    currentPath += part + '/';
+                    folderPaths.add(currentPath);
+                });
+            }
+        });
+
+        // Convert to array and sort by depth (shorter paths first)
+        const sortedPaths = Array.from(folderPaths).sort((a, b) => 
+            (a.match(/\//g) || []).length - (b.match(/\//g) || []).length
+        );
+
+        // Create folders one by one, tracking their IDs
+        for (const path of sortedPaths) {
+            const parts = path.split('/').filter(p => p);
+            const folderName = parts[parts.length - 1];
+            const parentPath = parts.slice(0, -1).join('/') + (parts.length > 1 ? '/' : '');
+            const parentId = this.folderIdMap[parentPath] || this.folder_id;
+            
+            try {
+                const folderId = await this.createFolder(folderName, parentId);
+                this.folderIdMap[path] = folderId;
+            } catch (error) {
+                console.error(`Failed to create folder ${path}:`, error);
+                // If folder creation fails, use the parent folder as fallback
+                this.folderIdMap[path] = parentId;
+            }
+        }
+    }
+
+    async createFolder(folderName, parentId) {
+        const url = `/api/create-folder/${parentId}/`;
+        const data = {
+            name: folderName,
+            description: `Auto-created folder during upload`,
+            remarks: 'Created by folder upload feature'
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': this.getCsrfToken(),
+                    'Content-Type': 'application/json',
+                    'Subscription-ID': SUBSCRIPTION_ID,
+                    'Client-Secret': CLIENT_SECRET,
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.result; // Return the new folder ID
+        } catch (error) {
+            console.error('Error creating folder:', error);
+            throw error;
         }
     }
 
@@ -241,14 +470,14 @@ class FileUploadModal {
         }
     }
 
-    async uploadFile(file, options) {
+    async uploadFile(file, options, targetFolderId) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const metadata = { 'options':options };
-        formData.append('metadata', JSON.stringify(metadata))
+        const metadata = { 'options': options };
+        formData.append('metadata', JSON.stringify(metadata));
 
-        const statusElement = this.fileList.querySelector(`[data-file="${file.name}"]`);
+        const statusElement = this.fileList.querySelector(`[data-file="${file.relativePath}"]`);
 
         try {
             const xhr = new XMLHttpRequest();
@@ -261,10 +490,10 @@ class FileUploadModal {
                         statusElement.textContent = `${filePercentage}%`;
 
                         // Update total progress
-                        const previousLoaded = this.fileStatuses[file.name]?.loaded || 0;
+                        const previousLoaded = this.fileStatuses[file.relativePath]?.loaded || 0;
                         const deltaLoaded = event.loaded - previousLoaded;
                         this.uploadedBytes += deltaLoaded;
-                        this.fileStatuses[file.name] = { loaded: event.loaded };
+                        this.fileStatuses[file.relativePath] = { loaded: event.loaded };
 
                         this.updateProgress(this.uploadedBytes, this.totalBytes);
                     }
@@ -285,7 +514,7 @@ class FileUploadModal {
                     reject(new Error('Upload failed'));
                 });
 
-                xhr.open('POST', `/api/upload-file/${this.folder_id}/`);
+                xhr.open('POST', `/api/upload-file/${targetFolderId}/`);
                 xhr.setRequestHeader('X-CSRFToken', this.getCsrfToken());
                 xhr.setRequestHeader('Subscription-ID', SUBSCRIPTION_ID);
                 xhr.setRequestHeader('Client-Secret', CLIENT_SECRET);
@@ -309,6 +538,7 @@ class FileUploadModal {
     close() {
         this.modal.style.display = 'none';
         this.files = [];
+        this.folderStructure = {};
         this.fileStatuses = {};
         this.uploading = false;
         this.updateFileList();
