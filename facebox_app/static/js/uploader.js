@@ -417,8 +417,8 @@ class FileUploadModal {
         const url = `/api/create-folder/${parentId}/`;
         const data = {
             name: folderName,
-            description: `Auto-created folder during upload`,
-            remarks: 'Created by folder upload feature'
+            description: `Auto-created folder during upload.`,
+            remarks: ''
         };
 
         try {
@@ -545,6 +545,7 @@ class FileUploadModal {
         this.totalProgress.style.width = '0%';
         this.statusMessage.style.display = 'none';
         this.errorMessages.textContent = '';
+	goToLibrary();
     }
 }
 

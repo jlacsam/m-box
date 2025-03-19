@@ -63,7 +63,7 @@ def create_folder(request,parent_id):
     insert_audit(request.user.username,'CREATE FOLDER','mbox_folder',parent_id,None,name,get_client_ip(request))
     update_last_modified(parent_id,'folder')
 
-    return Response({'result':f'{folder.folder_id}'}, status=status.HTTP_200_OK)
+    return Response({'result':folder.folder_id,'folder_level':folder.folder_level}, status=status.HTTP_200_OK)
 
 
 # Rename Folder ####################################################################################
@@ -725,6 +725,9 @@ def get_presigned_url(request, file_id, for_streaming=True):
         # Get file object from database
         file = MboxFile.objects.get(file_id=file_id)
 
+        if file.disabled:
+            return Response({'error': 'File is disabled.'}, status=status.HTTP_400_BAD_REQUEST)
+
         # Get storage bucket name and storage key
         if "://" in file.storage_key:
             parsed_url = urlparse(file.storage_key)
@@ -941,7 +944,8 @@ def upload_file(request,folder_id):
             domain_rights=folder.domain_rights,
             public_rights=folder.public_rights,
             ip_location=ip_addr,
-            status='NEW'
+            disabled=True,
+            status='for upload'
         )
         file.save() # This should somehow trigger an event that will start the AI processing
 

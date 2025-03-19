@@ -68,6 +68,7 @@ class MboxFile(models.Model):
     date_created = models.DateTimeField(db_default=True)
     date_uploaded = models.DateTimeField(db_default=True)
     is_deleted = models.BooleanField(db_default=True)
+    disabled = models.BooleanField(db_default=True)
     description = models.TextField(blank=True, null=True)
     tags = models.TextField(blank=True, null=True)
     texts = models.TextField(blank=True, null=True)

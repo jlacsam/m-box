@@ -48,7 +48,7 @@ def browse_folder(request, folder_id):
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 
         'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
-        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled'];
 
     query = """
         SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, fl.size, fl.file_url, 
@@ -56,7 +56,7 @@ def browse_folder(request, folder_id):
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, 
             fl.version, fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
-            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights, fl.disabled
         FROM mbox_file fl
         WHERE fl.folder_id = %s 
             AND NOT fl.is_deleted 
@@ -66,7 +66,7 @@ def browse_folder(request, folder_id):
             null, last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
             owner_rights, group_rights, domain_rights, public_rights, null, remarks,
             null, null, extra_data, null, null, null, null, null,
-            null, null, null, null, null, null
+            null, null, null, null, null, null, FALSE
         FROM mbox_folder
         WHERE parent_id = %s
             AND NOT is_deleted
@@ -788,7 +788,7 @@ def get_media(request, file_id):
         'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
         'group_name', 'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
         'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 
-        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
+        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled'];
     rows = []
     query = """
         SELECT f1.file_id,f1.folder_id,f1.name,f2.path_name,f1.extension,f1.media_type,f1.media_source,f1.size, 
@@ -796,7 +796,8 @@ def get_media(request, file_id):
             f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
             f1.group_name, f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
             f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
-            f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
+            f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights, 
+            f1.disabled
         FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
         WHERE NOT f1.is_deleted AND f1.file_id = %s 
     """
@@ -970,9 +971,10 @@ def get_folders(request, parent_id):
         FROM mbox_folder
     """
     if parent_id > 0:
-        query += "WHERE NOT is_deleted AND parent_id = %s"
+        query += "WHERE NOT is_deleted AND parent_id = %s "
     else:
-        query += "WHERE NOT is_deleted AND parent_id IS NULL"
+        query += "WHERE NOT is_deleted AND parent_id IS NULL "
+    query += "ORDER BY path_name ASC"
 
     with connection.cursor() as cursor:
         if parent_id > 0:

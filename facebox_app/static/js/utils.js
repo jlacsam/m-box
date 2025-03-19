@@ -612,6 +612,12 @@ function toTitleCase(str) {
     return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 }
 
+function trimString(str, trimStr) {
+  const escapedTrimStr = trimStr.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'); // Escape special characters
+  const regex = new RegExp(`^${escapedTrimStr}+|${escapedTrimStr}+$`, 'g');
+  return str.replace(regex, '');
+}
+
 function trimWhitespaces(str) {
     return str.replace(/\s+/g, ' ');
 }

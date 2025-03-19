@@ -62,6 +62,8 @@ a:visited {
   padding-top: 30px;
   padding-left: 10px;
   color: white;
+  min-width: 150px;
+  overflow: auto;
 }
 
 .files-section {
@@ -818,8 +820,20 @@ tr.highlighted {
   cursor: pointer;
 }
 
+.folder-label-icon {
+  white-space: nowrap;
+}
+
+.folder-label {
+  white-space: nowrap;
+}
+
+.folder-label-selected {
+  color: yellow;
+}
+
 .folder-label:hover {
-  background-color: yellow;
+  background-color: gray;
   cursor: pointer;
 }
 

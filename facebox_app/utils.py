@@ -495,7 +495,7 @@ def upload_to_storage(file_id, temp_file):
 def upload_to_s3(file_id, temp_file):
     try:
         # Get the file record
-        file_obj = get_object_or_404(MboxFile, file_id=file_id)
+        file_obj = MboxFile.objects.get(file_id=file_id)
 
         # Configure S3 client
         s3_client = boto3.client(
@@ -519,18 +519,20 @@ def upload_to_s3(file_id, temp_file):
         # Update record with S3 info
         file_obj.storage_key = 's3://' + bucket_name + '/' + storage_key
         file_obj.status = 'uploaded'
+        file_obj.disabled = False
         file_obj.save()
-
-        # Optionally remove the local file
-        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
-            os.remove(temp_file)
 
     except Exception as e:
         # Handle error
         if file_obj:
-            file_obj.status = 'failed'
-            file_obj.error_message = str(e)
+            file_obj.status = 'upload failed'
+            file_obj.remarks = str(e)
+            file_obj.disabled = True
             file_obj.save()
+
+    # Remove the local file
+    if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+        os.remove(temp_file)
 
 # Upload temporary file to Azure Blob Storage ######################################################
 def upload_to_azure(file_id, temp_file):
@@ -538,6 +540,7 @@ def upload_to_azure(file_id, temp_file):
 
 # Upload temporary file to Local Storage ###########################################################
 def upload_to_local(file_id, temp_file):
+    file_obj = None
     try:
         # Get the file size
         file_size = os.get_size(temp_file)
@@ -576,17 +579,18 @@ def upload_to_local(file_id, temp_file):
         file_obj = MboxFile.objects.get(file_id=file_id)
         file_obj.blob_offset = offset
         file_obj.status = 'uploaded'
+        file_obj.disabled = False
         file_obj.save()
-
-        # Optionally remove the local file
-        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
-            os.remove(temp_file)
 
     except Exception as e:
         # Handle error
         if file_obj:
-            file_obj.status = 'failed'
-            file_obj.error_message = str(e)
+            file_obj.status = 'upload failed'
+            file_obj.remarks = str(e)
+            file_obj.disabled = True
             file_obj.save()
 
+    # Optionally remove the local file
+    if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+        os.remove(temp_file)
 

@@ -3,6 +3,7 @@ const CLIENT_SECRET = "00000000";
 const FOLDER_ICON = "\u{1F4C1}";
 const FILE_ICON = "\u{1F5CE}";
 const AUDIO_ICON = "\u{1F5AD}";
+const DISABLED_ICON = "\u{1F6AB}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
 const DEFAULT_HIDDEN_COLUMNS = [6, 8, 9, 14, 16, 17, 18];
@@ -114,10 +115,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const uploadButton = document.getElementById('upload-button');
     uploadButton.onclick = () => {
-        window.open(
-            "/app/uploader/?folder_id=" + currentFolderID,
-            "_blank"
-        );
+        window.location.href = "/app/uploader/?folder_id=" + currentFolderID;
     }
 
     // Get initial folder
@@ -461,7 +459,9 @@ function displayResultsTiles(data, append = false) {
             <tr class="title-field" data-file-id-tile="${item.file_id}" >
                 <td class="tile-items">`;
 
-        if (item.extension == 'FOLDER') {
+        if (item.disabled) {
+            html += `<p class="tile-icon">${DISABLED_ICON}</p>`;
+        } else if (item.extension == 'FOLDER') {
             html += `<p class="tile-icon">${FOLDER_ICON}</p>`;
         } else if (item.media_type == 'audio') {
             html += `<p class="tile-icon">${AUDIO_ICON}</p>`;
@@ -550,7 +550,9 @@ function displayResults(results) {
             onclick='toggleContextButtons()'>
             <label for='cb_${item_type}_${item.file_id}'>${item.file_id}</label></td>`;
 
-        if (item.extension == 'FOLDER') {
+        if (item.disabled) {
+            html += `<td>${DISABLED_ICON}</td>`;
+        } else if (item.extension == 'FOLDER') {
             html += `<td>${FOLDER_ICON}</td>`;
         } else if (item.media_type == 'audio') {
             html += `<td>${AUDIO_ICON}</td>`;
@@ -728,60 +730,67 @@ function displayError(message) {
     resultsBody.innerHTML = `<tr><td colspan="20">${message}</td></tr>`;
 }
 
+function fetchFolders(parent_id = 1) {
+    const csrftoken = getCookie("csrftoken");
+    return fetch(`/api/get-folders/${parent_id}/`, {
+        method: "GET",
+        headers: {
+            "Subscription-ID": SUBSCRIPTION_ID,
+            "Client-Secret": CLIENT_SECRET,
+            "Parent-ID": parent_id,
+            "Max-Rows": maxRows,
+            "X-CSRFToken": csrftoken,
+        },
+    }).then((response) => response.json());
+}
+
+function createFolderElement(tree, folder) {
+    const row = document.createElement("tr");
+    const col = document.createElement("td");
+    const icon = document.createElement("span");
+    const label = document.createElement("span");
+    row.appendChild(col);
+    row.id = 'folder-branch-' + folder.folder_id;
+    col.appendChild(icon);
+    col.appendChild(label);
+    col.classList.add("folder-label-icon");
+    icon.innerHTML = FOLDER_ICON;
+    icon.style.paddingLeft = folder.folder_level * FOLDER_WIDTH + "px";
+    icon.setAttribute("folder_id", folder.folder_id);
+    icon.classList.add("folder-icon");
+    label.id = "folder-label-" + folder.folder_id;
+    label.innerHTML = folder.name;
+    label.setAttribute("folder_id", folder.folder_id);
+    label.setAttribute("folder_level", folder.folder_level);
+    label.setAttribute("folder_name", folder.name);
+    label.setAttribute("is_open", "false");
+    label.classList.add("folder-label");
+
+    // Handle folder double-click to load subfolders
+    icon.addEventListener("dblclick", function (event) {
+        let lastRow = row;
+        fetchFolders(folder.folder_id).then((subfolders) => {
+            if (subfolders.results.length) {
+                subfolders.results.forEach((subfolder) => {
+                    const newRow = createFolderElement(tree, subfolder);
+                    tree.insertBefore(newRow, lastRow.nextSibling);
+                    lastRow = newRow;
+                });
+            }
+            label.setAttribute("is_open","true");
+        });
+    });
+
+    // Handle folder click to select the folder
+    label.addEventListener("click", function (event) {
+        folder["path_name"] = folder.path + folder.name;
+        selectFolder(folder);
+    });
+
+    return row;
+}
+
 function getFolders(parent_id = 1, target='folder-browser', is_popup=true, reposition=true) {
-    function fetchFolders(parent_id = 1) {
-        const csrftoken = getCookie("csrftoken");
-        return fetch(`/api/get-folders/${parent_id}/`, {
-            method: "GET",
-            headers: {
-                "Subscription-ID": SUBSCRIPTION_ID,
-                "Client-Secret": CLIENT_SECRET,
-                "Parent-ID": parent_id,
-                "Max-Rows": maxRows,
-                "X-CSRFToken": csrftoken,
-            },
-        }).then((response) => response.json());
-    }
-
-    function createFolderElement(tree, folder) {
-        const row = document.createElement("tr");
-        const col = document.createElement("td");
-        const icon = document.createElement("span");
-        const label = document.createElement("span");
-        row.appendChild(col);
-        col.appendChild(icon);
-        col.appendChild(label);
-        icon.innerHTML = FOLDER_ICON;
-        icon.style.paddingLeft = folder.folder_level * FOLDER_WIDTH + "px";
-        icon.setAttribute("folder_id", folder.folder_id);
-        icon.classList.add("folder-icon");
-        label.innerHTML = folder.name;
-        label.setAttribute("folder_id", folder.folder_id);
-        label.classList.add("folder-label");
-
-        // Handle folder double-click to load subfolders
-        icon.addEventListener("dblclick", function (event) {
-            let lastRow = row;
-            fetchFolders(folder.folder_id).then((subfolders) => {
-                if (subfolders.results.length) {
-                    subfolders.results.forEach((subfolder) => {
-                        const newRow = createFolderElement(tree, subfolder);
-                        tree.insertBefore(newRow, lastRow.nextSibling);
-                        lastRow = newRow;
-                    });
-                }
-            });
-        });
-
-        // Handle folder click to select the folder
-        label.addEventListener("click", function (event) {
-            folder["path_name"] = folder.path + folder.name;
-            selectFolder(folder);
-        });
-
-        return row;
-    }
-
     function createRootFolder() {
         const table = document.createElement("table");
         const row = document.createElement("tr");
@@ -791,6 +800,7 @@ function getFolders(parent_id = 1, target='folder-browser', is_popup=true, repos
         row.appendChild(col);
         col.appendChild(icon);
         col.appendChild(label);
+        col.classList.add("folder-label-icon");
         table.appendChild(row);
         table.id = "folder-tree";
         icon.style.paddingLeft = "0px";
@@ -799,6 +809,9 @@ function getFolders(parent_id = 1, target='folder-browser', is_popup=true, repos
         icon.classList.add("folder-icon");
         label.innerHTML = "[all folders]";
         label.setAttribute("folder_id", 1);
+        label.setAttribute("folder_level", 0);
+        label.setAttribute("folder_name", "[all folders]");
+        label.setAttribute("is_open", "true");
         label.classList.add("folder-label");
 
         // Handle folder click to select the folder
@@ -838,11 +851,90 @@ function getFolders(parent_id = 1, target='folder-browser', is_popup=true, repos
                 folderBrowser.style.top = rect.y + rect.height + "px";
                 folderBrowser.style.left = rect.x + "px";
             }
+
+            traverseCurrentFolder(currentFolder);
         })
         .catch((error) => {
             console.log(error);
             alert("An error occurred while fetching folders.");
         });
+}
+
+function traverseCurrentFolder(target_path, start_level=0) {
+    const folderTree = document.getElementById('folder-tree');
+    const folders = trimString(target_path,'/').split("/");
+    const branches = folderTree.getElementsByClassName('folder-label');
+
+    let parent_id = 1;
+    let found = false;
+    for (let i = start_level; i < folders.length; i++) {
+        folder = folders[i];
+        found = false;
+
+        for (let j = 0; j < branches.length; j++) {
+            branch = branches[j];
+            branch_level = branch.getAttribute('folder_level');
+
+            if (branch_level != (i+1)) continue;
+            if (folder != branch.textContent) continue;
+            
+            found = true;
+            parent_id = branch.getAttribute('folder_id');
+
+            if (i == folders.length-1) {
+                highlightSelectedFolder(parent_id);
+            }
+
+            break;
+        }
+        // There is no such branch. Must load this branch.
+        if (!found) {
+            break;
+        }
+    }
+
+    // If found, it means all folders in the target path are in the folderTree
+    if (found) {
+        return;
+    }
+
+    const csrftoken = getCookie("csrftoken");
+    fetch(`/api/get-folders/${parent_id}/`, {
+        method: "GET",
+        headers: {
+            "Subscription-ID": SUBSCRIPTION_ID,
+            "Client-Secret": CLIENT_SECRET,
+            "Parent-ID": parent_id,
+            "Max-Rows": maxRows,
+            "X-CSRFToken": csrftoken,
+        },
+    })
+    .then((response) => response.json())
+    .then(folders => {
+        folders.results.forEach((folder) => {
+            const refRow = document.getElementById('folder-branch-'+parent_id);
+            newRow = createFolderElement(folderTree, folder);
+            folderTree.insertBefore(newRow, refRow.nextSibling);
+        });
+        const parentFolder = document.getElementById('folder-label-'+parent_id);
+        parentFolder.setAttribute('is_open','true');
+        traverseCurrentFolder(target_path, start_level+1);
+    });
+}
+
+function addBranchFolder(parent_id, folder_id, folder_level, folder_name) {
+    const branch = document.getElementById('folder-label-' + parent_id);
+    if (!branch) return;
+    if (branch.getAttribute('is_open') == 'false') return;
+    const folder = { 
+        'folder_id':folder_id, 
+        'folder_level':folder_level,
+        'name':folder_name
+    };
+    const folderTree = document.getElementById('folder-tree');
+    const newRow = createFolderElement(folderTree, folder);
+    const refRow = document.getElementById('folder-branch-'+parent_id);
+    folderTree.insertBefore(newRow, refRow.nextSibling);
 }
 
 function selectFolderByID(folder_id) {
@@ -861,6 +953,7 @@ function selectFolderByID(folder_id) {
             alert('Unable to get folder:' + data.error);
         } else {
             selectFolder(data.results[0]);
+            traverseCurrentFolder(currentFolder);
         }
     });
 }
@@ -878,8 +971,22 @@ function selectFolder(folder) {
     updatePlaceholder();
     browseFolder(folder.folder_id);
     applyFilters();
+    highlightSelectedFolder(folder.folder_id);
     setCookie('Library.currentFolder',currentFolder,7*24*60*60);
     setCookie('Library.currentFolderID',currentFolderID,7*24*60*60);
+}
+
+function highlightSelectedFolder(folder_id) {
+    const folderTree = document.getElementById('folder-tree');
+    const branches = folderTree.getElementsByClassName('folder-label');
+    for (let i = 0; i < branches.length; i++) {
+        branch = branches[i];
+        if (branch.getAttribute('folder_id') == folder_id) {
+            branch.classList.add('folder-label-selected');
+        } else {
+            branch.classList.remove('folder-label-selected');
+        }
+    }
 }
 
 function setMaxRows(value) {
@@ -1542,7 +1649,7 @@ function createFolder() {
     // Modal header
     const header = document.createElement('div');
     header.className = 'modal-header';
-    header.textContent = 'New Folder';
+    header.textContent = 'Create new folder in ' + currentFolder;
 
     const closeButton = document.createElement('button');
     closeButton.className = 'btn btn-primary';
@@ -1629,7 +1736,8 @@ function createFolder() {
             if (data.error) {
                 alert(data.error);
             } else {
-                // TO DO: show the new folder
+                browseFolder(currentFolderID); // The lazy way to show the added folder.
+                addBranchFolder(currentFolderID, data.result, data.folder_level, newName);
                 modalOverlay.remove();
             }
         })
@@ -1803,7 +1911,7 @@ function showAssetDetails(container, data) {
                        'tags','people','places','texts',
                        'last_accessed','last_modified','owner_id','owner_name','group_id','group_name',
                        'owner_rights','group_rights','domain_rights','ip_location','remarks',
-                       'version','file_status'];
+                       'version','file_status','disabled'];
     const tableBasic = document.createElement("table");
     tableBasic.className = 'asset-details';
     tableBasic.id = 'asset-details-basic';
