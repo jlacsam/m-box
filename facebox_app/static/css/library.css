@@ -1207,7 +1207,7 @@ tr.highlighted {
     border-bottom: 7px solid #1871ff;
 }
 
-.viewer-close-button {
+.viewer-close-button, .viewer-nav-button {
     font-family: sans-serif;
     font-size: 1.2em;
     font-weight: bold;
@@ -1216,6 +1216,10 @@ tr.highlighted {
     background-color: rgba(0, 0, 0, 0.9);
     align-items: center;
     border-width: 0px;
+}
+
+.viewer-close-button:hover, .viewer-nav-button:hover {
+    color: yellow;
 }
 
 .viewer-content {

@@ -7,13 +7,19 @@ const DISABLED_ICON = "\u{1F6AB}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
 const DEFAULT_HIDDEN_COLUMNS = [6, 8, 9, 14, 16, 17, 18];
+const CLOSE_ICON = "\u{24E7}";
+const FIRST_ICON = "\u{21E4}";
+const PREV_ICON = "\u{21A4}";
+const NEXT_ICON = "\u{21A6}";
+const LAST_ICON = "\u{21E5}";
+const INT_MAX = 2147483647;
 
 let currentPage = 1;
 let totalPages = 1;
 let recordSet = null;
 let currentFolder = "/";
 let currentFolderID = 1;
-let maxRows = 25;
+let maxRows = 250;
 let hiddenColumns = new Set(DEFAULT_HIDDEN_COLUMNS);
 
 $.fn.dataTable.ext.errMode = 'none';
@@ -1754,6 +1760,7 @@ function displayAsset(file_id, filename, type, source) {
     // Create modal overlay
     const modalOverlay = document.createElement('div');
     modalOverlay.className = 'viewer-overlay';
+    modalOverlay.setAttribute('file_id', file_id);
 
     // Viewer header
     const header = document.createElement('div');
@@ -1761,14 +1768,42 @@ function displayAsset(file_id, filename, type, source) {
     modalOverlay.appendChild(header);
 
     const title = document.createElement('span');
+    title.id = 'viewer-title';
     title.textContent = decodeURIComponent(filename);
     header.appendChild(title);
 
+    const ctrlButtons = document.createElement('span');
+    header.appendChild(ctrlButtons);
+
+    const firstButton = document.createElement('button');
+    firstButton.className = 'viewer-nav-button';
+    firstButton.textContent = FIRST_ICON;
+    firstButton.onclick = function() { displayFirstAsset(modalOverlay); }
+    ctrlButtons.appendChild(firstButton);
+
+    const prevButton = document.createElement('button');
+    prevButton.className = 'viewer-nav-button';
+    prevButton.textContent = PREV_ICON;
+    prevButton.onclick = function() { displayPreviousAsset(modalOverlay); }
+    ctrlButtons.appendChild(prevButton);
+
+    const nextButton = document.createElement('button');
+    nextButton.className = 'viewer-nav-button';
+    nextButton.textContent = NEXT_ICON;
+    nextButton.onclick = function() { displayNextAsset(modalOverlay); }
+    ctrlButtons.appendChild(nextButton);
+
+    const lastButton = document.createElement('button');
+    lastButton.className = 'viewer-nav-button';
+    lastButton.textContent = LAST_ICON;
+    lastButton.onclick = function() { displayLastAsset(modalOverlay); }
+    ctrlButtons.appendChild(lastButton);
+
     const closeButton = document.createElement('button');
     closeButton.className = 'viewer-close-button';
-    closeButton.textContent = '\u24E7';
+    closeButton.textContent = CLOSE_ICON;
     closeButton.onclick = function() { modalOverlay.remove(); }
-    header.appendChild(closeButton);
+    ctrlButtons.appendChild(closeButton);
 
     // Viewer content
     const content = document.createElement('div');
@@ -1805,6 +1840,7 @@ function displayAsset(file_id, filename, type, source) {
         assetElement.style.width = "100%";
         assetElement.style.height = "100%";
     }
+    assetElement.id = 'viewer-asset';
     mediaContainer.appendChild(assetElement);
 
     // Content right panel
@@ -2104,4 +2140,65 @@ function displayAudit(results) {
 
     const tabAudit = document.getElementById('asset-tab-audit');
     tabAudit.setAttribute('initialized', 'true');
+}
+
+function displayAdjacentAsset(modalOverlay, file_id, folder_id, direction) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-adjacent-media/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Media-Type': 'video,audio,photo,document',
+            'Skip-Status': '--NONE--',
+            'Folder-ID': folder_id,
+            'Direction': direction,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else if (data.results.length > 0) {
+            const next_file_id = data.results[0].file_id;
+            const next_file_name = data.results[0].file_name;
+            const next_media_type = data.results[0].media_type;
+            const next_url = data.results[0].file_url;
+
+            modalOverlay.setAttribute('file_id', next_file_id);
+            document.getElementById('viewer-title').textContent = next_file_name;
+            // TO DO: if the media_type changes, must switch element type
+            document.getElementById('viewer-asset').src = next_url; 
+
+            const container = document.getElementById('asset-details');
+            document.getElementById('asset-details-basic').remove();
+            document.getElementById('asset-details-iso').remove();
+            document.getElementById('asset-details-extras').remove();
+            document.getElementById('asset-details-audit-div').remove();
+
+            showAssetDetails(container, data.results[0])
+        }
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function displayFirstAsset(modalOverlay) {
+    displayAdjacentAsset(modalOverlay, 0, currentFolderID, 'forward');
+}
+
+function displayPreviousAsset(modalOverlay) {
+    const file_id = modalOverlay.getAttribute('file_id');
+    displayAdjacentAsset(modalOverlay, file_id, currentFolderID, 'backward');
+}
+
+function displayNextAsset(modalOverlay) {
+    const file_id = modalOverlay.getAttribute('file_id');
+    displayAdjacentAsset(modalOverlay, file_id, currentFolderID, 'forward');
+}
+
+function displayLastAsset(modalOverlay) {
+    displayAdjacentAsset(modalOverlay, INT_MAX, currentFolderID, 'backward');
 }

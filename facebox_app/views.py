@@ -835,12 +835,13 @@ def get_adjacent_media(request, file_id):
     skip_status = request.headers.get('Skip-Status')
  
     # Search for matching records in the database
-    labels = ['file_id', 'folder_id', 'file_name', 'folder_name', 'extension', 'media_source', 'size', 'file_url', 
-        'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 'places', 'texts', 
+    labels = ['file_id','folder_id','file_name','folder_name','extension','media_type','media_source','size', 
+        'file_url','archive_url','storage_key','date_created','date_uploaded','description','tags', 
+        'people', 'places', 'texts', 
         'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
         'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject',
-        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights'];
+        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled'];
     rows = []
 
     symbol = '<' 
@@ -856,12 +857,13 @@ def get_adjacent_media(request, file_id):
     placeholders2 = ','.join(['%s'] * len(skip_statuses))
 
     query = f"""
-    SELECT f1.file_id, f1.folder_id, f1.name, f2.path_name, f1.extension, f1.media_source, f1.size, f1.file_url, 
-        f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, f1.places, f1.texts, 
+    SELECT f1.file_id,f1.folder_id,f1.name,f2.path_name,f1.extension,f1.media_type,f1.media_source,f1.size,
+        f1.file_url,f1.archive_url,f1.storage_key,f1.date_created,f1.date_uploaded,f1.description,f1.tags, 
+        f1.people, f1.places, f1.texts, 
         f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, f1.group_name, 
         f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
         f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
-            f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights
+        f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights, f1.disabled
     FROM mbox_file f1 JOIN mbox_folder f2 ON f1.folder_id = f2.folder_id
     WHERE NOT f1.is_deleted AND 
         f1.file_id {symbol} %s AND 

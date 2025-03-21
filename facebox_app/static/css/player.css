@@ -639,7 +639,7 @@ audio {
 }
 
 #video-player {
-    max-width: 1024px;
+    max-width: 60vw; 
 }
 
 .video-filler {
@@ -677,7 +677,7 @@ audio {
     position: static;
     color: black;
     font-size: 0.8em;
-    width: 35%;
+    width: 35vw;
     background-color: #f1f7fa;
     height: 100%;
     padding: 10px 10px 10px 1px;
@@ -691,6 +691,7 @@ audio {
 
 #video-n-details {
     vertical-align: top;
+    width: 65vw;
     height: 100%;
     overflow: auto;
 }
