@@ -143,7 +143,7 @@ h3 {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -169,6 +169,11 @@ h3 {
     display: flex;
 }
 
+.modal-options h2 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
 .modal-footer {
     display: flex;
     justify-content: right;
@@ -180,13 +185,15 @@ h3 {
 }
 
 .folder-header {
-    background-color: #f0f0f0;
-    padding: 8px 12px;
-    margin-top: 10px;
-    border-radius: 4px;
+    font-family: sans-serif;
+    font-size: 0.8em;
+    margin: 2px;
+    padding: 4px 4px;
     font-weight: bold;
     display: flex;
     align-items: center;
+    background-color: #333333;
+    flex-grow: 1;
 }
 
 .folder-icon {
@@ -195,25 +202,29 @@ h3 {
 
 .folder-file {
     padding-left: 20px;
-    border-left: 2px solid #ddd;
+    border-left: 3px solid yellow;
     margin-left: 10px;
 }
 
 .file-item {
+    flex-basis: calc(33.33% - 20px);
+    margin: 2px;
+    flex-grow: 1;
+    font-family: sans-serif;
+    font-size: 0.9em;
     display: flex;
     justify-content: space-between;
-    padding: 6px 10px;
-    border-bottom: 1px solid #eee;
+    padding: 4px 4px;
+    background-color: #333333;
 }
 
 .drop-zone {
     border: 2px dashed #ccc;
     padding: 20px;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 5px;
     border-radius: 5px;
     cursor: pointer;
-    background-color: #f9f9f9;
     transition: all 0.3s ease;
 }
 
@@ -235,11 +246,15 @@ h3 {
     color: #999;
 }
 
+.progress-container {
+    margin-bottom: 20px;
+}
+
 .progress-bar {
     width: 100%;
-    height: 20px;
+    height: 10px;
     background-color: #f0f0f0;
-    border-radius: 10px;
+    border-radius: 5px;
     overflow: hidden;
 }
 
@@ -255,14 +270,10 @@ h3 {
     flex-wrap: wrap;
     margin-bottom: 5px;
     column-count: 3;
-    max-height: 200px;
+    max-height: 300px;
     overflow: auto;
-}
-
-.file-item {
-    flex-basis: calc(33.33% - 20px);
-    margin: 5px;
-    flex-grow: 1;
+    border: 2px solid #ccc;
+    border-radius: 5px;
 }
 
 .status-message {
@@ -279,6 +290,8 @@ h3 {
 }
 
 .upload-btn {
+    font-family: sans-serif;
+    font-size: 1em;
     background-color: #4CAF50;
     color: white;
     padding: 10px 20px;
@@ -325,5 +338,5 @@ h3 {
 }
 
 .target-path {
-    color: blue;
+    color: #4CAF50;
 }

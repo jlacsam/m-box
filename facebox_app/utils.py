@@ -5,18 +5,23 @@ import io
 import configparser
 import boto3
 import magic
+import time
+import struct
 
 from functools import wraps
 from keras_facenet import FaceNet
 from mtcnn import MTCNN
 from PIL import Image
 from pydub import AudioSegment
-from .models import MboxFile, MboxFolder, MboxAudit
+from .models import MboxFile, MboxFolder, MboxAudit, MboxBlob
+from urllib.parse import urlparse
 
-from django.db import connection
+from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.conf import settings
+from django.core.files.locks import lock, unlock
+from django.http import StreamingHttpResponse
 
 from rest_framework.response import Response
 from rest_framework import status
@@ -476,6 +481,38 @@ def update_text_embedding(file_id, source, time_range, new_text, old_text=None):
             cursor.execute(query, (new_chunk, embedding.tolist(), chunk_id))
             return cursor.rowcount
 
+# Detect content type based on the file extension ##################################################
+def detect_content_type(extension):
+    extension_to_content_type = {
+        # Video formats
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'ogv': 'video/ogg',
+        
+        # Audio formats
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'oga': 'audio/ogg',
+        
+        # Image formats
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp',
+        
+        # Document formats
+        'pdf': 'application/pdf',
+        
+        # Text and data formats
+        'txt': 'text/plain',
+        'xml': 'application/xml',
+        'json': 'application/json'
+    }
+    
+    clean_extension = extension.lower().lstrip('.')
+    return extension_to_content_type.get(clean_extension)
+
 # Upload temporary file from temporary storage to permanent storage ################################
 def upload_to_storage(file_id, temp_file):
 
@@ -509,7 +546,7 @@ def upload_to_s3(file_id, temp_file):
         max_files = int(getattr(settings, 'MAX_FILES_PER_STORAGE_BUCKET', 1000))
         bucket_name = settings.AWS_STORAGE_BUCKET_NAME
         folder = f'{(file_id // max_files):04X}'
-        file_name = f'{file_id:08X}__{file_obj.name}'
+        file_name = f'{file_id:X}__{file_obj.name}'
         storage_key = f'{folder}/{file_name}'
 
         mime = magic.Magic(mime=True)
@@ -531,8 +568,11 @@ def upload_to_s3(file_id, temp_file):
             file_obj.save()
 
     # Remove the local file
-    if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
-        os.remove(temp_file)
+    try:
+        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+            os.remove(temp_file)
+    except Exception as e:
+        print("Unable to remove temporary file but its not that bad.")
 
 # Upload temporary file to Azure Blob Storage ######################################################
 def upload_to_azure(file_id, temp_file):
@@ -542,41 +582,58 @@ def upload_to_azure(file_id, temp_file):
 def upload_to_local(file_id, temp_file):
     file_obj = None
     try:
-        # Get the file size
-        file_size = os.get_size(temp_file)
+        # Get the file object and its size
+        file_obj = MboxFile.objects.get(file_id=file_id)
+        file_size = os.path.getsize(temp_file)
 
-        # Get the storage blob that is least full.
-        query = """
-            SELECT blob_id, blob_path, (capacity-used) AS remaining 
-            FROM mbox_blob 
-            WHERE remaining > 0 
-            ORDER BY remaining DESC
-            LIMIT 1
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            blob = cursor.fetchone()
+        blob_id = 0
+        offset = 0
 
-        # If there is no such storage, create a new one
-        if blob is None:
-            label = f'BLOB{int(time.time()):08X}'
-            path = os.path.join(settings.BLOB_STORAGE, f'{label}.dat')
-            query = "INSERT INTO mbox_blob (label,path) VALUES (%s,%s) RETURNING blob_id"
+        with transaction.atomic():
             with connection.cursor() as cursor:
-                cursor.execute(query, (label, path))
-                blob_id = cursor.fetchone()[0]
-        else:
-            blob_id = blob[0]
-            path = blob[1]
 
-        # Append the file to that new storage
-        with open(temp_file, "rb") as infile:
-            with open(path, "ab") as outfile:
-                outfile.write(infile.read())
-                offset = outfile.tell()
+                # Acquire a table lock, wait for 7 seconds
+                cursor.execute("SET lock_timeout = 7000")
+                cursor.execute("LOCK TABLE mbox_blob IN EXCLUSIVE MODE")
+
+                # Get the oldest storage blob that can accommodate that incoming file.
+                query = """
+                    SELECT blob_id, label, path, used, capacity
+                    FROM mbox_blob 
+                    WHERE (capacity-used) >= %s 
+                    ORDER BY blob_id ASC
+                    LIMIT 1
+                """
+                cursor.execute(query, (file_size,))
+                blob = cursor.fetchone()
+
+                # If there is no such storage, throw an error
+                if blob is None:
+                    raise Exception(f"No blob has sufficient capacity for {file_obj.name}")
+        
+                blob_id = blob[0]
+                label = blob[1]
+                path = blob[2]
+
+                # Append the file to that new storage
+                with open(temp_file, "rb") as infile:
+                    with open(path, "ab") as outfile:
+                        lock(outfile, 1) # Redundant but better be safe than sorry
+                        try:
+                            offset = outfile.tell()
+                            outfile.write(struct.pack('<i',file_size))
+                            outfile.write(infile.read())
+                            outfile.write(b'\x00' * 8)
+                        finally:
+                            unlock(outfile)
+
+                # Update used space of the blob
+                query = "UPDATE mbox_blob SET used = used + %s WHERE blob_id = %s"
+                cursor.execute(query, (file_size, blob_id))
 
         # Store the offset in the file table
-        file_obj = MboxFile.objects.get(file_id=file_id)
+        file_obj.storage_key = 'blob://' + label + '?offset=' + str(offset)
+        file_obj.blob_id = blob_id
         file_obj.blob_offset = offset
         file_obj.status = 'uploaded'
         file_obj.disabled = False
@@ -591,6 +648,93 @@ def upload_to_local(file_id, temp_file):
             file_obj.save()
 
     # Optionally remove the local file
-    if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
-        os.remove(temp_file)
+    try:
+        if getattr(settings, 'DELETE_LOCAL_FILE_AFTER_UPLOAD', True):
+            os.remove(temp_file)
+    except Exception as e:
+        print("Unable to remove temporary file but its not that bad.")
 
+# Get a presigned url for an s3 object #############################################################
+def get_presigned_url_s3(file_id, for_streaming=True):
+    # Get file object from database
+    file = MboxFile.objects.get(file_id=file_id)
+
+    # Configure S3 client
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_DEFAULT_REGION
+    )
+
+    # Get storage bucket name and storage key
+    if "://" in file.storage_key:
+        parsed_url = urlparse(file.storage_key)
+        bucket_name = parsed_url.netloc
+        storage_key = parsed_url.path.lstrip('/')
+    else:
+        bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+        storage_key = file.storage_key
+
+    # Generate presigned URL with 24-hour expiration
+    target = "inline" if for_streaming else f"attachment; filename={file.name}"
+    return s3_client.generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': bucket_name,
+            'Key': storage_key,
+            'ResponseContentDisposition': target,
+            'ResponseContentType': detect_content_type(file.extension)
+        },
+        ExpiresIn=settings.MBOX_URL_EXPIRATION # in seconds
+    )
+
+# Stream a blob file to the web browser ############################################################
+def stream_blob_file(file_id):
+    try:
+        # Get file object from database
+        file = MboxFile.objects.get(file_id=file_id)
+
+        # Get blob object from database
+        blob = MboxBlob.objects.get(blob_id=file.blob_id)
+
+        # Check if file exists
+        if not os.path.exists(blob.path):
+            return Response({"error": "Blob not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Define a generator function to yield chunks
+        def file_chunk_generator(file_path, offset, chunk_size=131072):
+            with open(file_path, 'rb') as f:
+                position = offset
+                f.seek(position)
+                temp = f.read(4)
+                file_size = struct.unpack('<I', temp)[0]
+                position += 4
+                bytes_read = 0
+                while bytes_read < file_size:
+                    f.seek(position)
+                    remaining = file_size - bytes_read
+                    read_size = chunk_size if remaining >= chunk_size else remaining
+                    chunk = f.read(read_size)
+                    if not chunk:
+                        break
+
+                    yield chunk
+                    position += len(chunk)
+                    bytes_read += len(chunk)
+
+        # Create a streaming response
+        response = StreamingHttpResponse(
+            file_chunk_generator(blob.path, file.blob_offset),
+            content_type=detect_content_type(file.extension)
+        )
+
+        # Set appropriate headers
+        response['Content-Length'] = file.size
+        response['Content-Disposition'] = f'inline; filename="{file.name}"'
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+
+        return response
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

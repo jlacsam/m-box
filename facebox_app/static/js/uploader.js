@@ -123,10 +123,10 @@ class FileUploadModal {
         const items = e.dataTransfer.items;
         
         if (items) {
-            // Process dropped items (files or directories)
+            console.log("Process dropped items (files or directories)");
             this.processDataTransferItems(items);
         } else {
-            // Fallback to regular file handling if DataTransferItemList is not supported
+            console.log("Fallback to regular file handling if DataTransferItemList is not supported.");
             const files = e.dataTransfer.files;
             this.handleFileSelect(files);
         }
@@ -135,7 +135,9 @@ class FileUploadModal {
     async processDataTransferItems(items) {
         const validFiles = [];
         this.folderStructure = {};
-        
+       
+        console.log(`Processing ${items.length} items`); // Log total items
+
         // Function to process entries recursively
         const processEntry = async (entry, path = '') => {
             if (entry.isFile) {
@@ -145,7 +147,7 @@ class FileUploadModal {
                     file.relativePath = path + file.name;
                     file.folderPath = path;
                     validFiles.push(file);
-                    
+
                     // Update folder structure
                     if (path) {
                         let currentLevel = this.folderStructure;
@@ -193,13 +195,37 @@ class FileUploadModal {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             if (item.kind === 'file') {
-                const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : item.getAsEntry();
-                if (entry) {
+                const entry = item.webkitGetAsEntry?.() || item.getAsEntry?.();
+                if (entry && entry.isDirectory) {
                     await processEntry(entry);
+                } else {
+                    const file = item.getAsFile();
+                    if (file && this.isValidFileType(file)) {
+                        file.relativePath = file.name;
+                        file.folderPath = '';
+                        validFiles.push(file);
+                    }
                 }
             }
         }
-        
+
+        console.log(`Processed ${validFiles.length} valid files`); // Log result
+
+        if (validFiles.length === 0 && e.dataTransfer.files.length > 0) {
+            Array.from(e.dataTransfer.files).forEach(file => {
+                if (this.isValidFileType(file)) {
+                    file.relativePath = file.name;
+                    file.folderPath = '';
+                    validFiles.push(file);
+
+                    if (!this.folderStructure.files) {
+                        this.folderStructure.files = [];
+                    }
+                    this.folderStructure.files.push(file);
+                }
+            });
+        }
+
         this.files = [...this.files, ...validFiles];
         this.updateFileList();
     }
@@ -417,8 +443,8 @@ class FileUploadModal {
         const url = `/api/create-folder/${parentId}/`;
         const data = {
             name: folderName,
-            description: `Auto-created folder during upload.`,
-            remarks: ''
+            description: `Auto-created folder during upload`,
+            remarks: 'Created by folder upload feature'
         };
 
         try {
@@ -545,7 +571,7 @@ class FileUploadModal {
         this.totalProgress.style.width = '0%';
         this.statusMessage.style.display = 'none';
         this.errorMessages.textContent = '';
-	goToLibrary();
+        goToLibrary();
     }
 }
 

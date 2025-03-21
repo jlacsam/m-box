@@ -468,7 +468,7 @@ function displayResultsTiles(data, append = false) {
         } else {
             html += `<img class="thumbnail" id="thumbnail_tiles_${item.file_id}" 
             src="" data-video-url="${item.file_url}" alt="thumbnail"
-            onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>`;
+            onclick=displayAsset("${item.file_id}","${encodeURIComponent(item.file_name)}","${item.media_type}","${item.file_url}")>`;
         }
 
         html += `   <div>`;
@@ -478,7 +478,7 @@ function displayResultsTiles(data, append = false) {
                 ${item.file_name}</span>`;
         } else {
             html += `<span class="tile-text" 
-                onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+                onclick=displayAsset("${item.file_id}","${encodeURIComponent(item.file_name)}","${item.media_type}","${item.file_url}")>
                 ${item.file_name}</span>`;
         }
 
@@ -562,7 +562,7 @@ function displayResults(results) {
             html += `
             <td><img class="thumbnail thumbnail_tab" id="thumbnail_${item.file_id}" 
             src=""  data-video-url="${item.file_url}" alt="thumbnail" 
-            onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+            onclick=displayAsset("${item.file_id}","${encodeURIComponent(item.file_name)}","${item.media_type}","${item.file_url}")>
             </td>`;
         }
 
@@ -574,7 +574,7 @@ function displayResults(results) {
         } else {
             html += `<td id="item_name_${item_type}_${item.file_id}">
             <span style="cursor: pointer"
-                onclick=displayAsset("${item.file_id}","${item.file_name}","${item.media_type}","${item.file_url}")>
+                onclick=displayAsset("${item.file_id}","${encodeURIComponent(item.file_name)}","${item.media_type}","${item.file_url}")>
                 ${item.file_name}</span></td>`;
         }
 
@@ -1761,7 +1761,7 @@ function displayAsset(file_id, filename, type, source) {
     modalOverlay.appendChild(header);
 
     const title = document.createElement('span');
-    title.textContent = filename;
+    title.textContent = decodeURIComponent(filename);
     header.appendChild(title);
 
     const closeButton = document.createElement('button');
@@ -1907,7 +1907,7 @@ function showAssetDetails(container, data) {
     }
 
     const basicKeys = ['file_id','file_name','folder_name','extension','media_type','media_source','size',
-                       'file_url','archive_url','date_created','date_uploaded','description',
+                       'file_url','archive_url','storage_key','date_created','date_uploaded','description',
                        'tags','people','places','texts',
                        'last_accessed','last_modified','owner_id','owner_name','group_id','group_name',
                        'owner_rights','group_rights','domain_rights','ip_location','remarks',
@@ -1941,7 +1941,9 @@ function showAssetDetails(container, data) {
     const tableAttributes = document.createElement('table');
     tableAttributes.className = 'asset-details';
     tableAttributes.id = 'asset-details-attributes';
-    pairsToRows(tableAttributes, JSON.parse(data.attributes), null, false);
+    if (data.attributes) {
+        pairsToRows(tableAttributes, JSON.parse(data.attributes), null, false);
+    }
     divExtras.appendChild(tableAttributes);
 
     const labelExtraData = document.createElement('p');
@@ -1952,7 +1954,9 @@ function showAssetDetails(container, data) {
     const tableExtraData = document.createElement('table');
     tableExtraData.className = 'asset-details';
     tableExtraData.id = 'asset-details-attributes';
-    pairsToRows(tableExtraData, JSON.parse(data.extra_data), null, false);
+    if (data.extra_data) {
+        pairsToRows(tableExtraData, JSON.parse(data.extra_data), null, false);
+    }
     divExtras.appendChild(tableExtraData);
 
     container.appendChild(divExtras);

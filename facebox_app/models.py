@@ -93,6 +93,8 @@ class MboxFile(models.Model):
     people = models.TextField(blank=True, null=True)
     places = models.TextField(blank=True, null=True)
     webvtt = models.TextField(blank=True, null=True)
+    blob_id = models.IntegerField(blank=True, null=True)
+    blob_offset = models.IntegerField(blank=True, null=True)
     thumbnail_id = models.IntegerField(blank=True, null=True)
     thumbnail_offset = models.IntegerField(blank=True, null=True)
     status = models.CharField(max_length=20, blank=True, null=True)

@@ -1,6 +1,5 @@
 import os
 import json
-import boto3
 
 from django.conf import settings
 from django.db import connection
@@ -15,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
 from urllib.parse import urlparse
-from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers, update_text_embedding, upload_to_storage
+from .utils import validate_subscription, get_client_ip, check_folder_permission, check_file_permission, insert_audit, update_last_accessed, update_last_modified, validate_subscription_headers, update_text_embedding, upload_to_storage, get_presigned_url_s3, stream_blob_file
 from .models import MboxFile, MboxFolder, MboxPerson
 
 
@@ -713,14 +712,6 @@ def get_file_position(request, file_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_presigned_url(request, file_id, for_streaming=True):
-    # Configure S3 client
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_DEFAULT_REGION
-    )
-
     try:
         # Get file object from database
         file = MboxFile.objects.get(file_id=file_id)
@@ -728,31 +719,21 @@ def get_presigned_url(request, file_id, for_streaming=True):
         if file.disabled:
             return Response({'error': 'File is disabled.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get storage bucket name and storage key
-        if "://" in file.storage_key:
-            parsed_url = urlparse(file.storage_key)
-            bucket_name = parsed_url.netloc
-            storage_key = parsed_url.path.lstrip('/')
-        else:
-            bucket_name = settings.AWS_STORAGE_BUCKET_NAME
-            storage_key = file.storage_key
-
-        # Generate presigned URL with 24-hour expiration
-        target = "inline" if for_streaming else f"attachment; filename={file.name}"
-        url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': bucket_name,
-                'Key': storage_key,
-                'ResponseContentDisposition': target,
-            },
-            ExpiresIn=settings.MBOX_URL_EXPIRATION # in seconds
-        )
-        
         insert_audit(request.user.username,'VIEW ASSET','mbox_file',file_id,None,None,get_client_ip(request))
         update_last_accessed(file_id,'file')
 
-        return redirect(url)
+        if "blob://" in file.storage_key:
+            return stream_blob_file(file_id)
+        elif "azure://" in file.storage_key:
+            return Response({'error': 'Azure Blob Storage is not yet supported.'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        elif "s3://" in file.storage_key:
+            url = get_presigned_url_s3(file_id, for_streaming)
+            return redirect(url)
+        else:
+            url = get_presigned_url_s3(file_id, for_streaming)
+            return redirect(url)
+
     except MboxFile.DoesNotExist:
         return Response({'error': 'File not found'}, status=404)
     except Exception as e:

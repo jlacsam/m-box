@@ -48,7 +48,7 @@ def browse_folder(request, folder_id):
         'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 'group_name', 
         'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location', 'remarks', 
         'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 'publisher', 
-        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled'];
+        'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled', 'storage_key'];
 
     query = """
         SELECT fl.file_id, fl.folder_id, fl.name, fl.extension, fl.media_type, fl.media_source, fl.size, fl.file_url, 
@@ -56,7 +56,8 @@ def browse_folder(request, folder_id):
             fl.texts, fl.last_accessed, fl.last_modified, fl.owner_id, fl.owner_name, fl.group_id, fl.group_name, 
             fl.owner_rights, fl.group_rights, fl.domain_rights, fl.public_rights, fl.ip_location, fl.remarks, 
             fl.version, fl.attributes, fl.extra_data, fl.status, fl.title, fl.creator, fl.subject, fl.publisher,
-            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights, fl.disabled
+            fl.contributor, fl.identifier, fl.language, fl.relation, fl.coverage, fl.rights, fl.disabled,
+            fl.storage_key
         FROM mbox_file fl
         WHERE fl.folder_id = %s 
             AND NOT fl.is_deleted 
@@ -66,7 +67,7 @@ def browse_folder(request, folder_id):
             null, last_accessed, last_modified, owner_id, owner_name, group_id, group_name,
             owner_rights, group_rights, domain_rights, public_rights, null, remarks,
             null, null, extra_data, null, null, null, null, null,
-            null, null, null, null, null, null, FALSE
+            null, null, null, null, null, null, FALSE, null
         FROM mbox_folder
         WHERE parent_id = %s
             AND NOT is_deleted
@@ -784,16 +785,17 @@ def get_media(request, file_id):
    
     # Search for matching records in the database
     labels = ['file_id','folder_id','file_name','folder_name','extension','media_type','media_source','size', 
-        'file_url', 'archive_url', 'date_created', 'date_uploaded', 'description', 'tags', 'people', 
-        'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
+        'file_url', 'archive_url', 'storage_key', 'date_created', 'date_uploaded', 'description', 'tags', 
+        'people', 'places', 'texts', 'last_accessed', 'last_modified', 'owner_id', 'owner_name', 'group_id', 
         'group_name', 'owner_rights', 'group_rights', 'domain_rights', 'public_rights', 'ip_location',
         'remarks', 'version', 'attributes', 'extra_data', 'file_status', 'title', 'creator', 'subject', 
-        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 'disabled'];
+        'publisher', 'contributor', 'identifier', 'language', 'relation', 'coverage', 'rights', 
+        'disabled'];
     rows = []
     query = """
         SELECT f1.file_id,f1.folder_id,f1.name,f2.path_name,f1.extension,f1.media_type,f1.media_source,f1.size, 
-            f1.file_url, f1.archive_url, f1.date_created, f1.date_uploaded, f1.description, f1.tags, f1.people, 
-            f1.places, f1.texts, f1.last_accessed, f1.last_modified, f1.owner_id, f1.owner_name, f1.group_id, 
+            f1.file_url,f1.archive_url,f1.storage_key,f1.date_created,f1.date_uploaded,f1.description,f1.tags, 
+            f1.people,f1.places,f1.texts,f1.last_accessed,f1.last_modified,f1.owner_id,f1.owner_name,f1.group_id, 
             f1.group_name, f1.owner_rights, f1.group_rights, f1.domain_rights, f1.public_rights, f1.ip_location,
             f1.remarks, f1.version, f1.attributes, f1.extra_data, f1.status, f1.title, f1.creator, f1.subject,
             f1.publisher, f1.contributor, f1.identifier, f1.language, f1.relation, f1.coverage, f1.rights, 
