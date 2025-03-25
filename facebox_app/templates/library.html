@@ -126,6 +126,30 @@
         <button id="upload-button" class="upload-button">&#xFF0B</button>
     </div>
 
+    <div id="editor-div" class="editor-hidden">
+        <textarea id="editor-textarea" type="text" name="editor">&nbsp;</textarea>
+        <div id="editor-buttons">
+            <button id="editor-ok" class="editor-button" onclick="saveEdits()">&#x2713</button>
+            <button id="editor-cancel" class="editor-button" onclick="cancelEdits()">&#x10102</button>
+        </div>
+    </div>
+
+    <dialog id="key-value-dialog" class="dialog-key-value">
+        <div class="dialog-header">New Key-Value Pair
+            <button type="button" id="cancel-dialog" class="modal-btn modal-btn-close">X</button>
+        </div>
+        <form id="key-value-form" method="dialog">
+            <label for="keyInput" class="dialog-key-label">Key</label>
+            <input type="text" id="keyInput" name="key" required>
+            <label for="valueInput" class="dialog-value-label">Value</label>
+            <textarea type="text" id="valueInput" name="value" required>&nbsp;</textarea>
+            <div class="dialog-footer">
+                <span id="dialog-message" class="dialog-message">&nbsp;</span>
+                <button type="submit" class="dialog-submit-button" onclick="submitKeyValue()">Submit</button>
+            </div>
+        </form>
+    </dialog>
+
     <script>
         const q_is_editor = ('{{ is_editor}}' === 'True');
         const q_is_supervisor = ('{{ is_supervisor }}' === 'True');

@@ -253,6 +253,36 @@ function formatTime(seconds) {
     return date.toISOString().substr(11, 12);
 }
 
+function getElementType(extension) {
+  const extensionToElementType = {
+    // Video formats
+    'mp4': 'video',
+    'webm': 'video',
+    'ogg': 'video',
+    'ogv': 'video',
+
+    // Audio formats
+    'mp3': 'audio',
+    'wav': 'audio',
+    'oga': 'audio',
+
+    // Image formats
+    'jpg': 'image',
+    'jpeg': 'image',
+    'png': 'image',
+    'webp': 'image',
+
+    // Document formats
+    'pdf': 'iframe',
+    'txt': 'iframe',
+    'xml': 'iframe',
+    'json': 'iframe',
+  };
+
+  const cleanExtension = extension.toLowerCase().replace(/^\./, '');
+  return extensionToElementType[cleanExtension];
+}
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -344,6 +374,10 @@ function hasInvalidChars(str) {
     const invalid_chars = "*?'\"";
     const regex = new RegExp(`[${invalid_chars}]`);
     return regex.test(str);
+}
+
+function isAlphaNumeric(str) {
+    return /^[a-zA-Z0-9]+$/.test(str);
 }
 
 function isProperlyQuoted(str) {

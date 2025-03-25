@@ -7,6 +7,8 @@ const DISABLED_ICON = "\u{1F6AB}";
 const COLUMN_FILTER_ICON = "\u{25A5}";
 const FOLDER_WIDTH = 20;
 const DEFAULT_HIDDEN_COLUMNS = [6, 8, 9, 14, 16, 17, 18];
+const ADD_ICON = "+";
+const REMOVE_ICON = "\u{2212}";
 const CLOSE_ICON = "\u{24E7}";
 const FIRST_ICON = "\u{21E4}";
 const PREV_ICON = "\u{21A4}";
@@ -21,6 +23,9 @@ let currentFolder = "/";
 let currentFolderID = 1;
 let maxRows = 250;
 let hiddenColumns = new Set(DEFAULT_HIDDEN_COLUMNS);
+let editorDiv = null;
+let editorText = null;
+let editorSelect = null;
 
 $.fn.dataTable.ext.errMode = 'none';
 
@@ -123,6 +128,25 @@ document.addEventListener("DOMContentLoaded", function () {
     uploadButton.onclick = () => {
         window.location.href = "/app/uploader/?folder_id=" + currentFolderID;
     }
+
+    const keyInput = document.getElementById('keyInput');
+    keyInput.addEventListener('focus', function() { this.select(); });
+    const valueInput = document.getElementById('valueInput');
+    valueInput.addEventListener('focus', function() { this.select(); });
+
+    const dialog = document.getElementById('key-value-dialog');
+    dialog.addEventListener('close', () => {
+        const form = document.getElementById('key-value-form');
+        const key = form.elements.key.value;
+        const value = form.elements.value.value;
+        if (isAlphaNumeric(key)) {
+            updateExtraData(key, value);
+        }
+    });
+
+    document.getElementById('cancel-dialog').addEventListener('click', () => {
+        dialog.close();
+    });
 
     // Get initial folder
     savedFolder = getCookie('Library.currentFolder');
@@ -1773,7 +1797,22 @@ function displayAsset(file_id, filename, type, source) {
     header.appendChild(title);
 
     const ctrlButtons = document.createElement('span');
+    ctrlButtons.className = 'viewer-controls';
     header.appendChild(ctrlButtons);
+
+    const filePosition = document.createElement('p');
+    filePosition.id = 'viewer-file-position';
+    filePosition.className = 'viewer-nav-info';
+    filePosition.textContent = '(1 of ';
+    filePosition.style.display = 'none';
+    ctrlButtons.appendChild(filePosition);
+
+    const fileCount = document.createElement('p');
+    fileCount.id = 'viewer-file-count';
+    fileCount.className = 'viewer-nav-info';
+    fileCount.textContent = '10)';
+    fileCount.style.display = 'none';
+    ctrlButtons.appendChild(fileCount);
 
     const firstButton = document.createElement('button');
     firstButton.className = 'viewer-nav-button';
@@ -1819,29 +1858,58 @@ function displayAsset(file_id, filename, type, source) {
     const mediaContainer = document.createElement('div');
     mediaContainer.className = 'media-container';
     mediaContainer.id = 'media-container';
+    mediaContainer.setAttribute('media_type', type);
     leftPanel.appendChild(mediaContainer);
 
     // Create asset element
+    const photoAsset = document.createElement('img');
+    photoAsset.className = 'viewer-asset-photo viewer-asset-holder';
+    photoAsset.id = 'viewer-asset-photo';
+    photoAsset.style.display = 'none';
+    photoAsset.style.visibility = 'hidden';
+
+    const videoAsset = document.createElement('video');
+    videoAsset.className = 'viewer-asset-video viewer-asset-holder';
+    videoAsset.id = 'viewer-asset-video';
+    videoAsset.style.display = 'none';
+    videoAsset.style.visibility = 'hidden';
+    videoAsset.autoplay = false;
+
+    const audioAsset = document.createElement('audio');
+    audioAsset.className = 'viewer-asset-audio viewer-asset-holder';
+    audioAsset.id = 'viewer-asset-audio';
+    audioAsset.style.display = 'none';
+    audioAsset.style.visibility = 'hidden';
+    audioAsset.autoplay = false;
+
+    const docAsset = document.createElement('iframe');
+    docAsset.className = 'viewer-asset-document viewer-asset-holder';
+    docAsset.id = 'viewer-asset-document';
+    docAsset.style.display = 'none';
+    docAsset.style.visibility = 'hidden';
+
     let assetElement = null;
     if (type === 'photo') {
-        assetElement = document.createElement('img');
-        assetElement.src = source;
+        assetElement = photoAsset;
     } else if (type === 'video') {
-        assetElement = document.createElement('video');
-        assetElement.src = source;
+        assetElement = videoAsset;
         assetElement.controls = true;
     } else if (type === 'audio') {
-        assetElement = document.createElement('audio');
-        assetElement.src = source;
+        assetElement = audioAsset;
         assetElement.controls = true;
     } else if (type === 'document') {
-        assetElement = document.createElement('iframe');
-        assetElement.src = source;
+        assetElement = docAsset;
         assetElement.style.width = "100%";
         assetElement.style.height = "100%";
     }
-    assetElement.id = 'viewer-asset';
-    mediaContainer.appendChild(assetElement);
+
+    assetElement.src = source;
+    assetElement.style.display = 'block';
+    assetElement.style.visibility = 'visible';
+    mediaContainer.appendChild(photoAsset);
+    mediaContainer.appendChild(videoAsset);
+    mediaContainer.appendChild(audioAsset);
+    mediaContainer.appendChild(docAsset);
 
     // Content right panel
     const rightPanel = document.createElement('div');
@@ -1853,6 +1921,8 @@ function displayAsset(file_id, filename, type, source) {
     const tabs = document.createElement('div');
     rightPanel.appendChild(tabs);
     tabs.className = 'asset-tabs';
+    tabs.id = 'asset-tabs';
+    tabs.setAttribute('file_id', file_id);
 
     const btnBasic = document.createElement('button');
     btnBasic.textContent = 'Basic';
@@ -1884,12 +1954,22 @@ function displayAsset(file_id, filename, type, source) {
     btnAudit.onclick = function() { showAssetTab('audit'); };
     tabs.appendChild(btnAudit);
 
-    displayAssetInfo(rightPanel,file_id);
+    const btnTranscript = document.createElement('button');
+    btnTranscript.textContent = 'Transcript';
+    btnTranscript.className = 'asset-tab asset-tab-unselected';
+    btnTranscript.id = 'asset-tab-transcript';
+    btnTranscript.setAttribute('file_id', file_id);
+    btnTranscript.setAttribute('initialized', 'false');
+    btnTranscript.onclick = function() { showAssetTab('transcript'); };
+    tabs.appendChild(btnTranscript);
+
+    displayAssetInfo(rightPanel, file_id);
+    displayNavInfo(filePosition, fileCount, file_id);
 
     document.body.appendChild(modalOverlay);
 }
 
-function displayAssetInfo(container, file_id) {
+function displayAssetInfo(container, file_id, activeTab='basic') {
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-media/${file_id}/`, {
         method: 'GET',
@@ -1905,7 +1985,7 @@ function displayAssetInfo(container, file_id) {
             console.log(data.error);
         } else {
             if (data.results.length > 0) {
-                showAssetDetails(container, data.results[0]);
+                showAssetDetails(container, data.results[0], activeTab);
             } else {
                 alert('Record not found.');
             }
@@ -1916,9 +1996,14 @@ function displayAssetInfo(container, file_id) {
     });
 }
 
-function showAssetDetails(container, data) {
-        
-    function pairsToRows(table, jsonData, inclusions, titlecase=true) {
+function showAssetDetails(container, data, activeTab='basic') {
+
+    const editableKeys = ['file_name','media_source','description','tags','people','places','texts',
+                          'remarks','title','creator','subject','publisher','contributor','identifier',
+                          'source','language','relation','coverage','rights'];
+
+    function pairsToRows(table, jsonData, inclusions, titlecase=true, 
+                         editAll=false, parentKey='', showCheckBoxes=false) {
         for (const [key, value] of Object.entries(jsonData)) {
             if (inclusions) {
                 if (!inclusions.includes(key)) {
@@ -1933,15 +2018,38 @@ function showAssetDetails(container, data) {
             keyCell.className = 'asset-details-key';
             
             const valueCell = document.createElement("td");
+            valueCell.id = 'value-cell-' + key;
             valueCell.textContent = value;
             valueCell.className = 'asset-details-value';
             
+            if (editableKeys.includes(key) || editAll) {
+                keyCell.classList.add('editable-key');
+                valueCell.classList.add('editable-value');
+                valueCell.setAttribute('key',key);
+                valueCell.setAttribute('parent-key',parentKey);
+                valueCell.addEventListener('dblclick', () => showEditor(valueCell));
+            }
+
+            if (showCheckBoxes) {
+                const cbCell = document.createElement("td");
+                const checkBox = document.createElement('input');
+                checkBox.id = 'asset-detail-' + parentKey + '-' + key;
+                checkBox.type = 'checkbox';
+                cbCell.appendChild(checkBox);
+                cbCell.className = 'asset-details-checkbox';
+                row.appendChild(cbCell);
+            }
+
             row.appendChild(keyCell);
             row.appendChild(valueCell);
             table.appendChild(row);
         }
     }
 
+    const tabs = document.getElementById('asset-tabs');
+    tabs.setAttribute('activeTab', activeTab);
+
+    // Setup Basic tab
     const basicKeys = ['file_id','file_name','folder_name','extension','media_type','media_source','size',
                        'file_url','archive_url','storage_key','date_created','date_uploaded','description',
                        'tags','people','places','texts',
@@ -1951,24 +2059,27 @@ function showAssetDetails(container, data) {
     const tableBasic = document.createElement("table");
     tableBasic.className = 'asset-details';
     tableBasic.id = 'asset-details-basic';
-    tableBasic.style.display = 'table';
+    tableBasic.style.display = activeTab == 'basic' ? 'table' : 'none';
     pairsToRows(tableBasic, data, basicKeys);
     container.appendChild(tableBasic);
 
+    // Setup ISO tab
     const isoKeys = ['file_id','file_name','title','creator','subject','description','publisher',
                      'contributor','date_created','media_type','media_source','identifier','source',
                      'language','relation','coverage','rights'];
     const tableISO = document.createElement('table');
     tableISO.className = 'asset-details';
     tableISO.id = 'asset-details-iso';
-    tableISO.style.display = 'none';
+    tableISO.style.display = activeTab == 'iso' ? 'table' : 'none';
     pairsToRows(tableISO, data, isoKeys);
     container.appendChild(tableISO);
 
+    // Setup Extras tab
     const divExtras = document.createElement('div');
     divExtras.id = 'asset-details-extras';
-    divExtras.style.display = 'none';
+    divExtras.style.display = activeTab == 'extras' ? 'block' : 'none';
 
+    // Setup Extras-Attributes section
     const labelAttributes = document.createElement('p');
     labelAttributes.textContent = 'Attributes';
     labelAttributes.className = 'asset-label';
@@ -1982,16 +2093,37 @@ function showAssetDetails(container, data) {
     }
     divExtras.appendChild(tableAttributes);
 
-    const labelExtraData = document.createElement('p');
+    // Setup Extras-Extradata section
+    const divExtraData = document.createElement('div');
+    divExtraData.className = 'asset-extradata-div';
+    divExtras.appendChild(divExtraData);
+
+    const labelExtraData = document.createElement('span');
     labelExtraData.textContent = 'Extra Data';
     labelExtraData.className = 'asset-label';
-    divExtras.appendChild(labelExtraData);
+    divExtraData.appendChild(labelExtraData);
+
+    const spanEDButtons = document.createElement('span');
+    divExtraData.appendChild(spanEDButtons);
+
+    const btnAddExtraData = document.createElement('button');
+    btnAddExtraData.textContent = ADD_ICON;
+    btnAddExtraData.className = 'extradata-buttons';
+    btnAddExtraData.onclick = function() { addKeyValuePair(); };
+    spanEDButtons.appendChild(btnAddExtraData);
+
+    const btnRemoveExtraData = document.createElement('button');
+    btnRemoveExtraData.textContent = REMOVE_ICON;
+    btnRemoveExtraData.className = 'extradata-buttons';
+    btnRemoveExtraData.onclick = function() { removeKeyValuePair(); };
+    spanEDButtons.appendChild(btnRemoveExtraData);
 
     const tableExtraData = document.createElement('table');
     tableExtraData.className = 'asset-details';
-    tableExtraData.id = 'asset-details-attributes';
+    tableExtraData.id = 'asset-details-extra_data';
     if (data.extra_data) {
-        pairsToRows(tableExtraData, JSON.parse(data.extra_data), null, false);
+        tableExtraData.setAttribute('extra_data', data.extra_data);
+        pairsToRows(tableExtraData, JSON.parse(data.extra_data), null, false, true, 'extra_data', true);
     }
     divExtras.appendChild(tableExtraData);
 
@@ -1999,7 +2131,7 @@ function showAssetDetails(container, data) {
 
     const divAudit = document.createElement('div');
     divAudit.id = 'asset-details-audit-div';
-    divAudit.style.display = 'none';
+    divAudit.style.display = activeTab == 'audit' ? 'table' : 'none';
     divAudit.className = 'asset-audit-div';
 
     const tableAudit = document.createElement('table');
@@ -2009,86 +2141,141 @@ function showAssetDetails(container, data) {
     divAudit.appendChild(tableAudit);
 
     container.appendChild(divAudit);
+
+    const divTranscript = document.createElement('div');
+    divTranscript.id = 'asset-details-transcript-div';
+    divTranscript.style.display = activeTab == 'transcript' ? 'table' : 'none';
+    divTranscript.className = 'asset-transcript-div';
+
+    const tableTranscript = document.createElement('table');
+    tableTranscript.className = 'asset-transcript-table'; 
+    tableTranscript.id = 'asset-details-transcript';
+    tableTranscript.innerHTML = '<tr><td>Display transcript here.</td></tr>';
+    divTranscript.appendChild(tableTranscript);
+
+    container.appendChild(divTranscript);
+
+    if (activeTab == 'audit' || activeTab == 'transcript') showAssetTab(activeTab);
 }
 
 function showAssetTab(tab) {
+    const tabs = document.getElementById('asset-tabs');
+    tabs.setAttribute('activeTab', tab);
+
     const tabBasic = document.getElementById('asset-tab-basic');
     const tabISO = document.getElementById('asset-tab-iso');
     const tabExtras = document.getElementById('asset-tab-extras');
     const tabAudit = document.getElementById('asset-tab-audit');
+    const tabTranscript = document.getElementById('asset-tab-transcript');
 
     const tableBasic = document.getElementById('asset-details-basic');
     const tableISO = document.getElementById('asset-details-iso');
     const divExtras = document.getElementById('asset-details-extras');
     const divAudit = document.getElementById('asset-details-audit-div');
+    const divTranscript = document.getElementById('asset-details-transcript-div');
 
     if (tab == 'basic' && tableBasic) {
         tabBasic.classList.remove('asset-tab-unselected');
         tabISO.classList.remove('asset-tab-selected');
         tabExtras.classList.remove('asset-tab-selected');
         tabAudit.classList.remove('asset-tab-selected');
+        tabTranscript.classList.remove('asset-tab-selected');
 
         tabBasic.classList.add('asset-tab-selected');
         tabISO.classList.add('asset-tab-unselected');
         tabExtras.classList.add('asset-tab-unselected');
         tabAudit.classList.add('asset-tab-unselected');
+        tabTranscript.classList.add('asset-tab-unselected');
 
         tableBasic.style.display = 'table';
         tableISO.style.display = 'none';
         divExtras.style.display = 'none';
         divAudit.style.display = 'none';
+        divTranscript.style.display = 'none';
 
     } else if (tab == 'iso') {
         tabBasic.classList.remove('asset-tab-selected');
         tabISO.classList.remove('asset-tab-unselected');
         tabExtras.classList.remove('asset-tab-selected');
         tabAudit.classList.remove('asset-tab-selected');
+        tabTranscript.classList.remove('asset-tab-selected');
 
         tabBasic.classList.add('asset-tab-unselected');
         tabISO.classList.add('asset-tab-selected');
         tabExtras.classList.add('asset-tab-unselected');
         tabAudit.classList.add('asset-tab-unselected');
+        tabTranscript.classList.add('asset-tab-unselected');
 
         tableBasic.style.display = 'none';
         tableISO.style.display = 'table';
         divExtras.style.display = 'none';
         divAudit.style.display = 'none';
+        divTranscript.style.display = 'none';
 
     } else if (tab == 'extras') {
         tabBasic.classList.remove('asset-tab-selected');
         tabISO.classList.remove('asset-tab-selected');
         tabExtras.classList.remove('asset-tab-unselected');
         tabAudit.classList.remove('asset-tab-selected');
+        tabTranscript.classList.remove('asset-tab-selected');
 
         tabBasic.classList.add('asset-tab-unselected');
         tabISO.classList.add('asset-tab-unselected');
         tabExtras.classList.add('asset-tab-selected');
         tabAudit.classList.add('asset-tab-unselected');
+        tabTranscript.classList.add('asset-tab-unselected');
 
         tableBasic.style.display = 'none';
         tableISO.style.display = 'none';
         divExtras.style.display = 'block';
         divAudit.style.display = 'none';
+        divTranscript.style.display = 'none';
 
     } else if (tab == 'audit') {
         if (tabAudit.getAttribute('initialized') == 'false') {
-            showAssetAudit(tabAudit.getAttribute('file_id'));
+            showAssetAudit(tabs.getAttribute('file_id'));
         }
 
         tabBasic.classList.remove('asset-tab-selected');
         tabISO.classList.remove('asset-tab-selected');
         tabExtras.classList.remove('asset-tab-selected');
         tabAudit.classList.remove('asset-tab-unselected');
+        tabTranscript.classList.remove('asset-tab-selected');
 
         tabBasic.classList.add('asset-tab-unselected');
         tabISO.classList.add('asset-tab-unselected');
         tabExtras.classList.add('asset-tab-unselected');
         tabAudit.classList.add('asset-tab-selected');
+        tabTranscript.classList.add('asset-tab-unselected');
 
         tableBasic.style.display = 'none';
         tableISO.style.display = 'none';
         divExtras.style.display = 'none';
         divAudit.style.display = 'table';
+        divTranscript.style.display = 'none';
+
+    } else if (tab == 'transcript') {
+        if (tabTranscript.getAttribute('initialized') == 'false') {
+            showAssetTranscript(tabs.getAttribute('file_id'));
+        }
+
+        tabBasic.classList.remove('asset-tab-selected');
+        tabISO.classList.remove('asset-tab-selected');
+        tabExtras.classList.remove('asset-tab-selected');
+        tabAudit.classList.remove('asset-tab-selected');
+        tabTranscript.classList.remove('asset-tab-unselected');
+
+        tabBasic.classList.add('asset-tab-unselected');
+        tabISO.classList.add('asset-tab-unselected');
+        tabExtras.classList.add('asset-tab-unselected');
+        tabAudit.classList.add('asset-tab-unselected');
+        tabTranscript.classList.add('asset-tab-selected');
+
+        tableBasic.style.display = 'none';
+        tableISO.style.display = 'none';
+        divExtras.style.display = 'none';
+        divAudit.style.display = 'none';
+        divTranscript.style.display = 'table';
     }
 }
 
@@ -2142,6 +2329,116 @@ function displayAudit(results) {
     tabAudit.setAttribute('initialized', 'true');
 }
 
+function showAssetTranscript(file_id) {
+    function findChunk(chunks, cue_start) { 
+        for (let i = 0; i < chunks.length; i++) {
+            let chunk = chunks[i];
+            if (chunk.time_start <= cue_start && cue_start <= chunk.time_end) {
+                return chunk;
+            } 
+        }       
+        return null;
+    }
+
+    function colorizeCues(file_id, chunk_ratings) {
+        document.querySelectorAll('[id^="cue-conf-"]').forEach(element => {
+            const cueStartStr = element.getAttribute('data-cuestart');
+            if (cueStartStr) {
+                const cueStart = timeStringToSeconds(element.getAttribute('data-cuestart'));
+                const chunk = findChunk(chunk_ratings, cueStart);
+                if (chunk) {
+                    element.style.backgroundColor = ratingToColor(chunk.confidence);
+                }
+            }
+        });
+    }
+
+    function getChunkRatings(file_id) {
+        const csrftoken = getCookie('csrftoken');
+        fetch(`/api/get-chunk-ratings/${file_id}/`, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'Subscription-ID': SUBSCRIPTION_ID,
+                'Client-Secret': CLIENT_SECRET,
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.log(data.error);
+            } else {
+                colorizeCues(file_id, data.results);
+            }
+        })
+        .catch(error => {
+            console.log(error);
+        });
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-transcript/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayTranscript(data);
+        getChunkRatings(file_id);
+    })
+    .catch(error => {
+        const divTranscript = document.getElementById('asset-details-transcript-div');
+        divTranscript.innerHTML = error.message;
+    });
+}
+
+function displayTranscript(data) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const headerDiv = document.getElementById('header');
+    const transcript = document.getElementById('asset-details-transcript-div');
+
+    let webvtt = data.transcript[0].webvtt;
+    transcript.innerHTML = vttToHTML(webvtt);
+    transcript.style.height = (viewportHeight-3*headerDiv.style.height) + 'px';
+
+    const editables = document.getElementsByClassName('cue-text');
+    Array.from(editables).forEach(editable => {
+        editable.addEventListener('dblclick', () => showEditor(editable))
+    });
+
+    const timeRanges = document.getElementsByClassName('cue-timestamp');
+    Array.from(timeRanges).forEach(timeRange => {
+        timeRange.addEventListener('dblclick', () => {
+            const timeStart = timeStringToSeconds(timeRange.innerHTML.substring(0,12));
+            const playerName = (q_file_name == 'video') ? 'video-player' : 'audio-player';
+            const player = document.getElementById(playerName);
+            player.currentTime = timeStart;
+            player.play();
+        });
+    });
+
+    transcript.addEventListener('keydown', (event) => {
+       if (event.key == ' ' && event.target.tagName != 'INPUT' && event.target.tagName != 'TEXTAREA') {
+            event.preventDefault();
+       }
+    });
+
+    const tabTranscript = document.getElementById('asset-tab-transcript');
+    tabTranscript.setAttribute('initialized', 'true');
+}
+
 function displayAdjacentAsset(modalOverlay, file_id, folder_id, direction) {
     const csrftoken = getCookie('csrftoken');
     fetch(`/api/get-adjacent-media/${file_id}/`, {
@@ -2161,23 +2458,64 @@ function displayAdjacentAsset(modalOverlay, file_id, folder_id, direction) {
         if (data.error) {
             alert(data.error);
         } else if (data.results.length > 0) {
-            const next_file_id = data.results[0].file_id;
-            const next_file_name = data.results[0].file_name;
-            const next_media_type = data.results[0].media_type;
-            const next_url = data.results[0].file_url;
+            const file_obj = data.results[0];
+            const next_file_id = file_obj.file_id;
+            const next_file_name = file_obj.file_name;
+            const next_media_type = file_obj.media_type;
+            const next_url = file_obj.file_url;
 
             modalOverlay.setAttribute('file_id', next_file_id);
             document.getElementById('viewer-title').textContent = next_file_name;
-            // TO DO: if the media_type changes, must switch element type
-            document.getElementById('viewer-asset').src = next_url; 
+
+            const mediaContainer = document.getElementById('media-container');
+            const media_type = mediaContainer.getAttribute('media_type');
+
+            const placeHolders = document.getElementsByClassName('viewer-asset-holder');
+            Array.from(placeHolders).forEach(placeHolder => {
+                if (placeHolder.id != ('viewer-asset-' + next_media_type)) {
+                    placeHolder.style.display = 'none';
+                    placeHolder.style.visibility = 'hidden';
+                    placeHolder.src = '';
+                }
+            });
+
+            const assetViewer = document.getElementById('viewer-asset-'+next_media_type);
+            assetViewer.src = next_url;
+            assetViewer.style.display = 'block';
+            assetViewer.style.visibility = 'visible';
+            mediaContainer.setAttribute('media_type', next_media_type);
+
+            // Force reflow to display audio element
+            void assetViewer.offsetHeight;
+
+            if (next_media_type == 'video' || next_media_type == 'audio') {
+                assetViewer.load();
+                setTimeout(() => {
+                    assetViewer.controls = true;
+                    void assetViewer.offsetHeight;
+                });
+            }
 
             const container = document.getElementById('asset-details');
             document.getElementById('asset-details-basic').remove();
             document.getElementById('asset-details-iso').remove();
             document.getElementById('asset-details-extras').remove();
             document.getElementById('asset-details-audit-div').remove();
+            document.getElementById('asset-details-transcript-div').remove();
 
-            showAssetDetails(container, data.results[0])
+            const tabAudit = document.getElementById('asset-tab-audit');
+            tabAudit.setAttribute('initialized', 'false');
+
+            const tabTranscript = document.getElementById('asset-tab-transcript');
+            tabTranscript.setAttribute('initialized', 'false');
+
+            const tabs = document.getElementById('asset-tabs');
+            const activeTab = tabs.getAttribute('activeTab');
+            tabs.setAttribute('file_id', next_file_id);
+            showAssetDetails(container, data.results[0], activeTab);
+
+            const filePosition = document.getElementById('viewer-file-position');
+            getFilePosition(filePosition,next_file_id, currentFolderID);
         }
     })
     .catch(error => {
@@ -2201,4 +2539,270 @@ function displayNextAsset(modalOverlay) {
 
 function displayLastAsset(modalOverlay) {
     displayAdjacentAsset(modalOverlay, INT_MAX, currentFolderID, 'backward');
+}
+
+function displayNavInfo(filePosition, fileCount, file_id) {
+    getFilePosition(filePosition, file_id, currentFolderID);
+    getFileCount(fileCount, currentFolderID);
+    filePosition.style.display = 'inline-block';
+    fileCount.style.display = 'inline-block';
+}
+
+function getFilePosition(filePosition, file_id, folder_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-file-position/${file_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'Folder-ID': folder_id,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        filePosition.textContent = '(' + data.result + ' of';
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function getFileCount(fileCount, folder_id) {
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/get-file-count/${folder_id}/`, {
+        method: 'GET',
+        headers: {
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        totalFiles = data.result;
+        fileCount.textContent = data.result + ' files)';
+    })
+    .catch(error => {
+        console.log(error);
+    });
+}
+
+function showEditor(editable) {
+    // Check if user can edit this record
+    const tabs = document.getElementById('asset-tabs');
+    const file_id = tabs.getAttribute('file_id');
+
+    // TO DO: Optional: Check backend
+
+    if (editorDiv == null)
+        editorDiv = document.getElementById('editor-div');
+
+    if (editorText == null)
+        editorText = document.getElementById('editor-textarea');
+
+    if (editorDiv.classList.contains('editor-visible'))
+        cancelEdits();
+
+    editorDiv.classList.remove('editor-hidden');
+    editorDiv.classList.add('editor-visible');
+
+    const rect = editable.getBoundingClientRect();
+    editorDiv.style.width = (rect.width) + 'px';
+    editorDiv.style.height = (rect.height+8) + 'px'; // Space for margins
+    editorText.style.width = (rect.width-48) + 'px'; // Space for the buttons
+
+    // Store the value of the editable into an attribute
+    parentKey = editable.getAttribute('parent-key');
+    key = editable.getAttribute('key');
+    editorText.value = editable.textContent;
+    editorText.setAttribute('file_id', file_id);
+    editorText.setAttribute('original-id', editable.id);
+    editorText.setAttribute('original-parent-key', parentKey);
+    editorText.setAttribute('original-key', key);
+    editorText.setAttribute('original-value', editable.textContent);
+    editable.textContent = '';
+
+    // Remove the editorDiv from its current parent, then append to a new parent
+    editorDiv.remove();
+    editable.appendChild(editorDiv);
+
+    // Hide/show the textarea
+    editorText.style.display = 'inline';
+    editorText.focus();
+}
+
+function saveEdits() {
+    // Check if there is something to save
+    if (editorText.getAttribute('original-value') == editorText.value) {
+        console.log('Nothing to save.');
+        cancelEdits();
+        return;
+    }
+
+    const file_id = editorText.getAttribute('file_id');
+    const parentKey = editorText.getAttribute('original-parent-key');
+    const key = editorText.getAttribute('original-key');
+    const value = editorText.value;
+    updateFile(file_id, parentKey, key, value);
+}
+
+function updateFile(file_id, parentKey, key, value) {
+    // Store data to database
+    let pair = {};
+
+    if (parentKey != '') {
+        const tableExtradata =  document.getElementById('asset-details-extra_data');
+        const edStr = tableExtradata.getAttribute('extra_data');
+        const edJson = JSON.parse(edStr);
+        edJson[key] = value;
+        pair[parentKey] = edJson;
+    } else {
+        pair[key] = value;
+    }
+
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/update-file/${file_id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify(pair)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        editorDiv.classList.remove('editor-visible');
+        editorDiv.classList.add('editor-hidden');
+        const editable = document.getElementById(editorText.getAttribute('original-id'));
+        editable.textContent = value;
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+
+function cancelEdits() {
+    const editable = document.getElementById(editorText.getAttribute('original-id'));
+
+    editorDiv.classList.remove('editor-visible');
+    editorDiv.classList.add('editor-hidden');
+
+    editable.textContent = editorText.getAttribute('original-value');
+}
+
+function submitKeyValue() {
+    const form = document.getElementById('key-value-form');
+    const key = form.elements.key.value;
+    const value = form.elements.value.value;
+
+    const message = document.getElementById('dialog-message');
+    if (!isAlphaNumeric(key)) {
+        message.textContent = 'A key must be alphanumeric.';
+    } else {
+        const dialog = document.getElementById('key-value-dialog');
+        dialog.close();
+    }
+}
+
+function updateExtraData(key, value) {
+    let pair = {};
+
+    const tabs = document.getElementById('asset-tabs');
+    const file_id = tabs.getAttribute('file_id');
+    const tableExtradata =  document.getElementById('asset-details-extra_data');
+    const edStr = tableExtradata.getAttribute('extra_data');
+    const edJson = JSON.parse(edStr);
+    edJson[key] = value;
+    pair['extra_data'] = edJson;
+
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/update-file/${file_id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify(pair)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        addPairToTable(key, value);
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+
+function addPairToTable(key, value) {
+    const table = document.getElementById('asset-details-extra_data');
+    const row = document.createElement("tr");
+ 
+    const parentKey = 'extra_data';
+    const keyCell = document.createElement("td");
+    keyCell.textContent = toTitleCase(key.replace('_',' '));
+    keyCell.className = 'asset-details-key';
+    keyCell.classList.add('editable-key');
+
+    const valueCell = document.createElement("td");
+    valueCell.id = 'value-cell-' + key;
+    valueCell.textContent = value;
+    valueCell.className = 'asset-details-value';
+    valueCell.classList.add('editable-value');
+    valueCell.setAttribute('key',key);
+    valueCell.setAttribute('parent-key',parentKey);
+    valueCell.addEventListener('dblclick', () => showEditor(valueCell));
+
+    const cbCell = document.createElement("td");
+    const checkBox = document.createElement('input');
+    checkBox.id = 'asset-detail-' + parentKey + '-' + key;
+    checkBox.type = 'checkbox';
+    cbCell.appendChild(checkBox);
+    cbCell.className = 'asset-details-checkbox';
+
+    row.appendChild(cbCell);
+    row.appendChild(keyCell);
+    row.appendChild(valueCell);
+    table.appendChild(row);
+}
+
+function addKeyValuePair() {
+    document.getElementById('key-value-dialog').showModal();
+    document.getElementById('keyInput').focus();
+}
+
+function removeKeyValuePair() {
+    console.log('Remove selected pairs.');
 }
