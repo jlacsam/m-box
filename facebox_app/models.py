@@ -146,6 +146,7 @@ class MboxFolder(models.Model):
     remarks = models.TextField(blank=True, null=True)
     schema_id = models.IntegerField(blank=True, null=True)
     extra_data = models.JSONField(blank=True, null=True)
+    inherit = models.BooleanField(db_default=True)
 
     class Meta:
         managed = False

@@ -52,6 +52,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const setAccessButton = document.getElementById("btn-set-access");
     setAccessButton.addEventListener("click", () => setItemAccess());
 
+    const setDeleteButton = document.getElementById("btn-delete");
+    setDeleteButton.addEventListener("click", () => deleteItem());
+
+    const setConfigureButton = document.getElementById("btn-configure");
+    setConfigureButton.addEventListener("click", () => configureItem());
+
     const searchBox = document.getElementById("search-box");
     searchBox.addEventListener("keyup", function (event) {
         if (event.key === "Enter") {
@@ -129,23 +135,103 @@ document.addEventListener("DOMContentLoaded", function () {
         window.location.href = "/app/uploader/?folder_id=" + currentFolderID;
     }
 
+    // Setup Key-Value Dialog
     const keyInput = document.getElementById('keyInput');
     keyInput.addEventListener('focus', function() { this.select(); });
     const valueInput = document.getElementById('valueInput');
     valueInput.addEventListener('focus', function() { this.select(); });
 
     const dialog = document.getElementById('key-value-dialog');
+    dialog.setAttribute('close-action','cancel');
     dialog.addEventListener('close', () => {
         const form = document.getElementById('key-value-form');
         const key = form.elements.key.value;
         const value = form.elements.value.value;
         if (isAlphaNumeric(key)) {
-            updateExtraData(key, value);
+            if (dialog.getAttribute('close-action') == 'submit') {
+                updateExtraData(key, value);
+            }
         }
     });
 
     document.getElementById('cancel-dialog').addEventListener('click', () => {
+        dialog.setAttribute('close-action','cancel');
         dialog.close();
+    });
+
+    // Setup Configure Folder Dialog
+    const cfDialog = document.getElementById('cf-configure-folder');
+    const cfEmptyRow = `
+      <td><input type="checkbox" class="row-selector" name="cf-cb"></td>
+      <td><input type="text" class="key-input" name="cf-key"></td>
+      <td><select class="select-required" name="cf-req">
+            <option value="Required">Required</option>
+            <option value="Optional">Optional</option>
+          </select></td>
+      <td><select class="select-data-type" name="cf-data-type">
+            <option value="Text">Text</option>
+            <option value="Number">Number</option>
+            <option value="Select">Select</option>
+            <option value="Date">Date</option>
+            <option value="Time">Time</option>
+            <option value="Date+Time">Date+Time</option>
+            <option value="Month+Year">Month+Year</option>
+            <option value="Week+Year">Week+Year</option>
+          </select></td>
+      <td><input type="text" class="value-input" name="cf-validation"></td>`;
+
+    const cfTBody = cfDialog.querySelector('#cf-json-body');
+    const cfAddBtn = cfDialog.querySelector('.cf-add-btn');
+    cfAddBtn.addEventListener('click', () => {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = cfEmptyRow;
+        cfTBody.appendChild(newRow);
+    });
+
+    const cfDeleteBtn = cfDialog.querySelector('.cf-delete-btn');
+    cfDeleteBtn.addEventListener('click', () => {
+        const selectedRows = cfTBody.querySelectorAll('tr input.row-selector:checked');
+        selectedRows.forEach(checkbox => checkbox.closest('tr').remove());
+    });
+
+    const cfCloseBtn = cfDialog.querySelector('.cf-close-btn');
+    cfCloseBtn.addEventListener('click', () => {
+        cfDialog.close();
+    });
+
+    const cfOkBtn = cfDialog.querySelector('.cf-ok-btn');
+    cfOkBtn.addEventListener('click', () => {
+        try {
+            const updatedObject = {};
+            const keys = [];
+            const rows = cfTBody.querySelectorAll('tr');
+
+            rows.forEach(row => {
+                const keyInput = row.querySelector('.key-input');
+                const required = row.querySelector('.select-required');
+                const dataType = row.querySelector('.select-data-type');
+                const validation = row.querySelector('.value-input');
+
+                const key = keyInput.value.trim();
+                const value = valueInput.value.trim();
+
+                if (key) {
+                    validateKeyAndRegex(key, value);
+                    let attribs = {
+                        "keyName" : key,
+                        "required" : required.value,
+                        "dataType" : dataType.value,
+                        "validation" : value
+                    };
+                    keys.push(attribs);
+                }
+            });
+
+            updatedObject["fields"] = keys;
+            cfDialog.close();
+        } catch (error) {
+            alert(error.message);
+        }
     });
 
     // Get initial folder
@@ -179,11 +265,21 @@ function toggleContextButtons() {
     const query = 'input[type="checkbox"][id^="cb_"]';
 
     let hasSelected = false;
+    let count = 0;
+    let hasFolder = false;
     Array.from(document.querySelectorAll(query)).forEach(checkbox => {
         if (checkbox.checked) {
             hasSelected = true;
+            count += 1;
+            if (checkbox.getAttribute('data-item-type') == 'folder') {
+                hasFolder = true;
+            }
         }
     });
+
+    const btnConfigure = document.getElementById('btn-configure');
+    btnConfigure.style.display = (hasFolder && count == 1) ? 'inline' : 'none';
+    
     contextButtons.style.display = hasSelected ? 'block' : 'none';
 }
 
@@ -495,6 +591,8 @@ function displayResultsTiles(data, append = false) {
             html += `<p class="tile-icon">${FOLDER_ICON}</p>`;
         } else if (item.media_type == 'audio') {
             html += `<p class="tile-icon">${AUDIO_ICON}</p>`;
+        } else if (item.media_type == 'document') {
+            html += `<p class="tile-icon">${FILE_ICON}</p>`;
         } else {
             html += `<img class="thumbnail" id="thumbnail_tiles_${item.file_id}" 
             src="" data-video-url="${item.file_url}" alt="thumbnail"
@@ -577,6 +675,7 @@ function displayResults(results) {
             data-item-type='${item_type}'
             data-item-id='${item.file_id}'
             data-item-name='${item.file_name}'
+            data-item-extra_data='${sanitizeHtml(item.extra_data)}'
             onclick='toggleContextButtons()'>
             <label for='cb_${item_type}_${item.file_id}'>${item.file_id}</label></td>`;
 
@@ -598,12 +697,12 @@ function displayResults(results) {
 
         if (item.extension == 'FOLDER') {
             html += `<td id="item_name_${item_type}_${item.file_id}">
-            <span style="cursor: pointer"
+            <span class="folder-file-name"
                 onclick=selectFolderByID(${item.file_id})>
                 ${item.file_name}</span></td>`;
         } else {
             html += `<td id="item_name_${item_type}_${item.file_id}">
-            <span style="cursor: pointer"
+            <span class="folder-file-name"
                 onclick=displayAsset("${item.file_id}","${encodeURIComponent(item.file_name)}","${item.media_type}","${item.file_url}")>
                 ${item.file_name}</span></td>`;
         }
@@ -1318,7 +1417,7 @@ function moveItem() {
                     const folder_id = data.folder_id;
                     moveFiles(items, folder_id)
                         .then(results => {
-                            footer.textContent = `${results.successful} successfully updated, ${results.failed} failed.`;
+                            footer.textContent = `${results.successful} items updated, ${results.failed} failed.`;
                             if (results.errors.length > 0) {
                                 results.errors.map(({id, itemName, error}) => {
                                     const errMsg = document.createElement('div');
@@ -1441,7 +1540,7 @@ function setItemOwner() {
         const footer = document.getElementById('modal-footer');
         updateOwners(items, selectedUser)
             .then(results => {
-                footer.textContent = `${results.successful} successfully updated, ${results.failed} failed.`;
+                footer.textContent = `${results.successful} items updated, ${results.failed} failed.`;
                 if (results.errors.length > 0) {
                     results.errors.map(({id, itemName, error}) => {
                         const errMsg = document.createElement('div');
@@ -1557,7 +1656,7 @@ function setItemGroup() {
         const footer = document.getElementById('modal-footer');
         updateGroups(items, selectedGroup)
             .then(results => {
-                footer.textContent = `${results.successful} successfully updated, ${results.failed} failed.`;
+                footer.textContent = `${results.successful} items updated, ${results.failed} failed.`;
                 if (results.errors.length > 0) {
                     results.errors.map(({id, itemName, error}) => {
                         const errMsg = document.createElement('div');
@@ -1655,7 +1754,7 @@ function setItemAccess() {
         const footer = document.getElementById('modal-footer');
         updateAccess(items, ownerRights, groupRights, domainRights, publicRights)
             .then(results => {
-                footer.textContent = `${results.successful} successfully updated, ${results.failed} failed.`;
+                footer.textContent = `${results.successful} items updated, ${results.failed} failed.`;
                 if (results.errors.length > 0) {
                     results.errors.map(({id, itemName, error}) => {
                         const errMsg = document.createElement('div');
@@ -1666,6 +1765,93 @@ function setItemAccess() {
                 }
             });
     };
+}
+
+function deleteItem() {
+    let query = 'input[type="checkbox"]:checked[id^="cb_"]';
+    const checkedBoxes = document.querySelectorAll(query);
+    if (!checkedBoxes.length) {
+        alert("No selected folder or file!");
+        return;
+    }
+
+    const items = Array.from(checkedBoxes).map(cb => [
+        cb.getAttribute('data-item-id'),
+        cb.getAttribute('data-item-name'),
+        cb.getAttribute('data-item-type')
+    ]).sort((a, b) => a[1] < b[1]);
+
+    const modalOverlay = createModalOverlay('Delete Folders/Files','Delete', items, 'textbox');
+    document.body.appendChild(modalOverlay);
+
+    const userSelect = document.getElementById('user-select');
+    userSelect.placeholder = "Type 'delete' to confirm.";
+
+    const okButton = document.getElementById('modal-ok-button');
+    okButton.onclick = () => {
+        const confirmation = userSelect.value.trim();
+        if (confirmation.length == 0 || confirmation != 'delete') {
+            alert("Type the word 'delete' to continue.");
+            return;
+        }
+
+        const csrftoken = getCookie("csrftoken");
+        const deleteItems = async items => {
+            const results = {
+                successful: 0,
+                failed: 0,
+                errors: []
+            };
+
+            const promises = items.map(([id, itemName, itemType]) => {        
+                return fetch(`/api/delete-${itemType}/${id}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Subscription-ID': SUBSCRIPTION_ID,
+                        'Client-Secret': CLIENT_SECRET,
+                        'X-CSRFToken': csrftoken,
+                    },
+                })
+                .then(response => response.json())
+                .then((data) => {
+                    const itemListItem = document.getElementById(`item-list-item-${itemType}-${id}`);
+                    if (data.error) {
+                        results.failed++;
+                        results.errors.push({ id: id, itemName: itemName, error: data.error });
+                        itemListItem.innerHTML += '&nbsp;&times;';
+                    } else {
+                        results.successful++;
+                        itemListItem.innerHTML += '&nbsp;&check;';
+                        document.getElementById(`row_${itemType}_${id}`).remove();
+                    }
+                })
+                .catch(error => {
+                    results.failed++;
+                    results.errors.push({ id: id, itemName: itemName, error: error });
+                });
+            });
+
+            await Promise.all(promises);
+            return results;
+        };
+
+        const footer = document.getElementById('modal-footer');
+        deleteItems(items)
+            .then(results => {
+                footer.textContent = `${results.successful} items updated, ${results.failed} failed.`;
+                if (results.errors.length > 0) {
+                    results.errors.map(({id, itemName, error}) => {
+                        const errMsg = document.createElement('div');
+                        errMsg.className = 'error-msg-item';
+                        errMsg.textContent = `${id}:${itemName}: ${error}`;
+                        document.getElementById('modal-statusbar').appendChild(errMsg);
+                    });
+                } else {
+                    toggleContextButtons();
+                }
+            });
+    }
 }
 
 function createFolder() {
@@ -1882,7 +2068,7 @@ function displayAsset(file_id, filename, type, source) {
     audioAsset.style.visibility = 'hidden';
     audioAsset.autoplay = false;
 
-    const docAsset = document.createElement('iframe');
+    const docAsset = document.createElement('embed');
     docAsset.className = 'viewer-asset-document viewer-asset-holder';
     docAsset.id = 'viewer-asset-document';
     docAsset.style.display = 'none';
@@ -2012,6 +2198,8 @@ function showAssetDetails(container, data, activeTab='basic') {
             }
 
             const row = document.createElement("tr");
+            row.id = 'row-extra_data-' + key;
+            row.setAttribute('key',key);
             
             const keyCell = document.createElement("td");
             keyCell.textContent = titlecase ? toTitleCase(key.replace('_',' ')) : key;
@@ -2035,6 +2223,7 @@ function showAssetDetails(container, data, activeTab='basic') {
                 const checkBox = document.createElement('input');
                 checkBox.id = 'asset-detail-' + parentKey + '-' + key;
                 checkBox.type = 'checkbox';
+                checkBox.setAttribute('key',key);
                 cbCell.appendChild(checkBox);
                 cbCell.className = 'asset-details-checkbox';
                 row.appendChild(cbCell);
@@ -2714,16 +2903,23 @@ function cancelEdits() {
     editable.textContent = editorText.getAttribute('original-value');
 }
 
-function submitKeyValue() {
+function submitKeyValue(event) {
+    event.preventDefault(); // Prevents the dialog from closing on other conditions
     const form = document.getElementById('key-value-form');
     const key = form.elements.key.value;
     const value = form.elements.value.value;
+    const tableExtradata = document.getElementById('asset-details-extra_data');
+    const edStr = tableExtradata.getAttribute('extra_data');
+    const edJson = JSON.parse(edStr);
 
     const message = document.getElementById('dialog-message');
     if (!isAlphaNumeric(key)) {
         message.textContent = 'A key must be alphanumeric.';
+    } else if (edJson && edJson.hasOwnProperty(key)) {
+        message.textContent = `"${key}" is already used.`;
     } else {
         const dialog = document.getElementById('key-value-dialog');
+        dialog.setAttribute('close-action','submit');
         dialog.close();
     }
 }
@@ -2735,8 +2931,13 @@ function updateExtraData(key, value) {
     const file_id = tabs.getAttribute('file_id');
     const tableExtradata =  document.getElementById('asset-details-extra_data');
     const edStr = tableExtradata.getAttribute('extra_data');
-    const edJson = JSON.parse(edStr);
-    edJson[key] = value;
+    let edJson = JSON.parse(edStr);
+    if (edJson) {
+        edJson[key] = value;
+    } else {
+        edJson = {}
+        edJson[key] = value;
+    }
     pair['extra_data'] = edJson;
 
     const csrftoken = getCookie('csrftoken');
@@ -2759,6 +2960,7 @@ function updateExtraData(key, value) {
         return response.json();
     })
     .then(data => {
+        tableExtradata.setAttribute('extra_data',JSON.stringify(edJson));
         addPairToTable(key, value);
     })
     .catch(error => {
@@ -2769,10 +2971,12 @@ function updateExtraData(key, value) {
 function addPairToTable(key, value) {
     const table = document.getElementById('asset-details-extra_data');
     const row = document.createElement("tr");
+    row.id = 'row-extra_data-' + key;
+    row.setAttribute('key',key);
  
     const parentKey = 'extra_data';
     const keyCell = document.createElement("td");
-    keyCell.textContent = toTitleCase(key.replace('_',' '));
+    keyCell.textContent = key;
     keyCell.className = 'asset-details-key';
     keyCell.classList.add('editable-key');
 
@@ -2789,6 +2993,7 @@ function addPairToTable(key, value) {
     const checkBox = document.createElement('input');
     checkBox.id = 'asset-detail-' + parentKey + '-' + key;
     checkBox.type = 'checkbox';
+    checkBox.setAttribute('key',key);
     cbCell.appendChild(checkBox);
     cbCell.className = 'asset-details-checkbox';
 
@@ -2799,10 +3004,165 @@ function addPairToTable(key, value) {
 }
 
 function addKeyValuePair() {
+    document.getElementById("keyInput").value = '';
+    document.getElementById("valueInput").value = '';
+    document.getElementById("dialog-message").textContent = '';
+
     document.getElementById('key-value-dialog').showModal();
     document.getElementById('keyInput').focus();
 }
 
+function removeExtraData(removeList) {
+
+    const tabs = document.getElementById('asset-tabs');
+    const file_id = tabs.getAttribute('file_id');
+    const tableExtradata =  document.getElementById('asset-details-extra_data');
+    const edStr = tableExtradata.getAttribute('extra_data');
+    const edJson = JSON.parse(edStr);
+
+    for (let key in edJson) {
+        if (removeList.includes(key)) {
+            delete edJson[key];
+        }
+    }
+
+    let pair = {};
+    pair['extra_data'] = edJson;
+
+    const csrftoken = getCookie('csrftoken');
+    fetch(`/api/update-file/${file_id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Subscription-ID': SUBSCRIPTION_ID,
+            'Client-Secret': CLIENT_SECRET,
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify(pair)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        const tableExtraData = document.getElementById('asset-details-extra_data');
+        tableExtraData.setAttribute('extra_data', edJson);
+        const rows = tableExtraData.getElementsByTagName('tr');
+        for (let i = rows.length-1; i >= 0; i--) {
+            const row = rows[i];
+            if (removeList.includes(row.getAttribute('key'))) {
+                tableExtraData.deleteRow(i);
+            }
+        }
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+
 function removeKeyValuePair() {
-    console.log('Remove selected pairs.');
+    let removeList = [];
+    const query = 'input[type="checkbox"][id^="asset-detail-"]';
+    Array.from(document.querySelectorAll(query)).forEach(checkbox => {
+        if (checkbox.checked) {
+            removeList.push(checkbox.getAttribute('key'));
+        }
+    });
+
+    if (removeList.length == 0) {
+        alert("No items selected for deletion.");
+        return;
+    }
+
+    let response = prompt("Type 'delete' if you wish to permanently delete\nthe following data:\n\n" +
+                          removeList.toString());
+
+    if (response != 'delete') return;
+
+    removeExtraData(removeList);
+}
+
+function configureItem() {
+    let query = 'input[type="checkbox"]:checked[id^="cb_"]';
+    const checkedBoxes = document.querySelectorAll(query);
+    if (!checkedBoxes.length) {
+        alert("No selected folder or file!");
+        return;
+    }
+
+    const items = Array.from(checkedBoxes).map(cb => [
+        cb.getAttribute('data-item-id'),
+        cb.getAttribute('data-item-name'),
+        cb.getAttribute('data-item-type'),
+        desanitizeHtml(cb.getAttribute('data-item-extra_data'))
+    ]).sort((a, b) => a[1] < b[1]);
+
+    const jsonStr = items[0][3].trim().length > 0 ? sanitizeJson(items[0][3].trim()) : "{}";
+    const jsonObject = JSON.parse(jsonStr);
+    const folder_name = items[0][1];
+    configureFolder(jsonObject, folder_name);
+}
+
+function configureFolder(jsonObject, folder_name) {
+  // Validate input
+  if (typeof jsonObject !== 'object' || Array.isArray(jsonObject)) {
+    throw new Error('Input must be a single-level JSON object');
+  }
+
+  // Get references to key elements
+  const dialog = document.getElementById('cf-configure-folder');
+  const subtitle = dialog.querySelector('.cf-subtitle');
+  const tbody = dialog.querySelector('#cf-json-body');
+  const okBtn = dialog.querySelector('.cf-ok-btn');
+  const emptyRow = `
+      <td><input type="checkbox" class="row-selector" name="cf-cb"></td>
+      <td><input type="text" class="key-input" name="cf-key"></td>
+      <td><select class="select-required" name="cf-req">
+            <option value="Required">Required</option>
+            <option value="Optional">Optional</option>
+          </select></td>
+      <td><select class="select-data-type" name="cf-data-type">
+            <option value="Text">Text</option>
+            <option value="Number">Number</option>
+            <option value="Select">Select</option>
+            <option value="Date">Date</option>
+            <option value="Time">Time</option>
+            <option value="Date+Time">Date+Time</option>
+            <option value="Month+Year">Month+Year</option>
+            <option value="Week+Year">Week+Year</option>
+          </select></td>
+      <td><input type="text" class="value-input" name="cf-validation"></td>`;
+
+  // Show the folder name
+  subtitle.textContent = folder_name;
+
+  // Show the contents of the JSON object
+  tbody.innerHTML = ((jsonObject && jsonObject.fields && jsonObject.fields.length > 0) 
+    ? jsonObject.fields.map((field, index) => `
+    <tr>
+      <td><input type="checkbox" class="row-selector" name="cf-cb"></td>
+      <td><input type="text" class="key-input" value="${field.keyName}" name="cf-key"></td>
+      <td><select class="select-required" name="cf-req"> 
+            <option value="Required" ${field.required==="Required"?"selected":""}>Required</option>
+            <option value="Optional" ${field.required==="Optional"?"selected":""}>Optional</option>
+          </select></td>
+      <td><select type="text" class="select-data-type" name="cf-data-type">
+            <option value="Text" ${field.dataType==="Text"?"selected":""}>Text</option>
+            <option value="Number" ${field.dataType==="Number"?"selected":""}>Number</option>
+            <option value="Select" ${field.dataType==="Select"?"selected":""}>Select</option>
+            <option value="Date" ${field.dataType==="Date"?"selected":""}>Date</option>
+            <option value="Time" ${field.dataType==="Time"?"selected":""}>Time</option>
+            <option value="Date+Time" ${field.dataType==="Date+Time"?"selected":""}>Date+Time</option>
+            <option value="Month+Year" ${field.dataType==="Month+Year"?"selected":""}>Month+Year</option>
+            <option value="Week+Year" ${field.dataType==="Week+Year"?"selected":""}>Week+Year</option>
+          </select></td>
+      <td><input type="text" class="value-input" value="${field.validation}" name="cf-validation"></td>
+    </tr>
+  `).join('') : "") || `<tr>${emptyRow}</tr>`;
+
+  dialog.showModal();
 }

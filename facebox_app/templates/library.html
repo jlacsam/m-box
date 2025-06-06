@@ -75,7 +75,11 @@
                         <button id="btn-set-owner" class="control-button">Set Owner</button>
                         <button id="btn-set-group" class="control-button">Set Group</button>
                         <button id="btn-set-access" class="control-button">Set Access</button>
+                        <button id="btn-delete" class="control-button">Delete</button>
+                        <button id="btn-configure" class="control-button">Configure</button>
                     </div>
+                    <button id="btn-refresh" class="refresh-button" 
+                        onclick="browseFolder(currentFolderID)">&#x1F5D8;</button>
                     <button id="column-filter-button"></button>
                     <label class="switch">
                         <input type="checkbox" id="toggleViewBtn">
@@ -145,9 +149,47 @@
             <textarea type="text" id="valueInput" name="value" required>&nbsp;</textarea>
             <div class="dialog-footer">
                 <span id="dialog-message" class="dialog-message">&nbsp;</span>
-                <button type="submit" class="dialog-submit-button" onclick="submitKeyValue()">Submit</button>
+                <button type="submit" class="dialog-submit-button" onclick="submitKeyValue(event)">Submit</button>
             </div>
         </form>
+    </dialog>
+
+    <dialog id="cf-configure-folder">
+        <div class="cf-modal-content">
+          <div class="cf-modal-header">
+            <div class="cf-modal-title">
+              <h2>Configure Folder</h2>
+              <p class="cf-subtitle">FOLDER NAME</p>
+            </div>
+            <button class="cf-close-btn" formmethod="dialog">&times;</button>
+          </div>
+          <table class="cf-json-table">
+            <thead>
+              <tr>
+                <th class="cf-json-td-cb">&nbsp;</th>
+                <th class="cf-json-td-keys">Keys</th>
+                <th class="cf-json-td-required">Required</th>
+                <th class="cf-json-td-data-type">Data Type</th>
+                <th class="cf-json-td-values">Validation REGEX</th>
+              </tr>
+            </thead>
+            <tbody id="cf-json-body">
+            </tbody>
+          </table>
+          <div class="cf-modal-actions">
+            <div class="cf-action-buttons">
+              <button class="cf-add-btn" type="button">+</button>
+              <button class="cf-delete-btn" type="button">&#x2212</button>
+            </div>
+          </div>
+          <div class="cf-modal-footer">
+            <span class="cf-inherit-span">
+              <input type="checkbox" id="cf-inherit">
+              <label for="cf-inherit" class="cf-inherit-label">Enable folder contents to inherit the above metadata.</label>
+            </span>
+            <button class="cf-ok-btn" type="button">OK</button>
+          </div>
+        </div>
     </dialog>
 
     <script>

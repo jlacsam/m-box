@@ -228,6 +228,7 @@ form {
 
 .tile-text {
   font-size: 0.8em;
+  color: #1871FF;
   cursor: pointer;
   padding: 10px 5px 0px 5px;
 }
@@ -379,7 +380,11 @@ form {
   cursor: pointer;
 }
 
-.filter-button {
+.context-buttons {
+  padding-right: 10px;
+}
+
+.filter-button, .refresh-button {
   width: 48px;
   height: 32px;
   border-radius: 6px;
@@ -1078,7 +1083,7 @@ tr.highlighted {
 
 .modal-content, .dialog-key-value {
     background-color: white;
-    padding: 10px;
+    padding: 20px;
     border-radius: 5px;
     min-width: 400px;
     max-width: 80vw;
@@ -1509,4 +1514,121 @@ tr.highlighted {
     color: white;
     height: 30px;
     min-width: 93px;
+}
+
+.folder-file-name {
+    color: #1871FF;
+    cursor: pointer;
+}
+
+.cf-json-config-modal {
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+}
+
+.cf-json-config-modal::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.cf-modal-content {
+    padding: 0px;
+}
+
+.cf-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.cf-modal-title h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.cf-subtitle {
+    margin: 5px 0 0;
+    color: #666;
+}
+
+.cf-close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.cf-json-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cf-json-table th, .cf-json-table td {
+    border: 1px solid #ddd;
+    padding: 4px;
+}
+
+.cf-json-table th {
+    font-family: sans-serif;
+    font-size: 0.9em;
+    color: white;
+}
+
+.cf-json-td-cb {
+    width: 20px;
+}
+
+.cf-json-td-keys {
+    width: 150px;
+}
+
+.cf-json-td-values {
+    width: 300px;
+}
+
+.cf-json-table input {
+    width: 100%;
+    border: none;
+    outline: none;
+}
+
+.cf-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.cf-action-buttons button {
+    margin-left: 0px;
+}
+
+.cf-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 15px;
+    align-items: center;
+}
+
+.cf-modal-footer button {
+    padding: 5px 10px;
+    width: 100px;
+    height: 30px;
+    background-color: #1871FF;
+    border: 0px;
+    border-radius: 5px;
+}
+
+.cf-inherit-span {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cf-inherit-label {
+    font-family: sans-serif;
+    font-size: 0.8em;
 }

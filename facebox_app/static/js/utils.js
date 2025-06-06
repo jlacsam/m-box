@@ -663,6 +663,21 @@ function truncateAtWord(str, maxLength = 500, suffix = '...') {
     return idx !== -1 ? str.substring(0, idx) + suffix : str.substring(0, maxLength) + suffix;
 }
 
+function validateKeyAndRegex(key, value) {
+    // Key validation: only alphanumeric, underscore, and dash
+    const keyRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!keyRegex.test(key)) {
+      throw new Error(`Invalid key: ${key}. Only alphanumeric, underscore, and dash allowed.`);
+    }
+
+    // Regex validation
+    try {
+      new RegExp(value);
+    } catch (error) {
+      throw new Error(`Invalid regex for key ${key}: ${error.message}`);
+    }
+}
+
 function vttToHTML(vttString,class_name='cue-text') {
   const lines = vttString.trim().split('\n');
   

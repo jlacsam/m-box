@@ -86,7 +86,7 @@ def browse_folder(request, folder_id):
     cursor.close()
 
     # Insert an audit record for this action
-    insert_audit(request.user.username,'BROWSE FOLDER','mbox_file',folder_id,None,str(params),get_client_ip(request))
+    insert_audit(request.user.username,'BROWSE FOLDER','mbox_folder',folder_id,None,str(params),get_client_ip(request))
 
     # Serialize the results and return the response
     if len(rows):
