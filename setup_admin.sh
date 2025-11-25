@@ -2,7 +2,7 @@
 
 # Add a user named admin with a password
 useradd -m -s /bin/bash user
-echo "admin:f5f8903f" | chpasswd
+echo "admin:ffffffff" | chpasswd
 
 # Make sudo require a password
 echo "admin ALL=(ALL) ALL" >> /etc/sudoers
