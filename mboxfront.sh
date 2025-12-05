@@ -2,23 +2,23 @@
 
 # AUTH_ADFS
 # CLIENT_ID: Home > Entra ID > Manage > App registrations > [your app] > Application (client) ID
-export AZURE_CLIENT_ID='b210533f-da48-4eeb-97ee-2d5328913a1b'
+export AZURE_CLIENT_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 
 # TENANT_ID: Home > Entra ID > Tenant ID
-export AZURE_TENANT_ID='208bb8cb-5f6d-413d-aeec-6be0ce6ad6a5'
+export AZURE_TENANT_ID='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 
 # CLIENT_SECRET: Home > Entra ID > Manage > App registrations > [your app] > Manage > Certificates & secrets > Value
-export AZURE_CLIENT_SECRET='J2p8Q~LkWuOSNf4VADvQp2AtzlPQEWTuXaiWIa1S'
+export AZURE_CLIENT_SECRET='XXXXX~XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
 
 # Azure Blob Storage Access
 # AZURE_CONNECTION_STRING: Home > [your blob storage] > Security + networking > Access keys > Connection string
-export AZURE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=ayalamedialib;AccountKey=XFv/79FwVeooejIfcHWZ/eI6U3DKtcKZ2ZDb8zwnkcSZgFBJnIz3K0LJvdCKYOGETaZHJ1BZ8zwN+ASt9PPZuQ==;EndpointSuffix=core.windows.net'
+export AZURE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=medialib;AccountKey=XFv/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX==;EndpointSuffix=core.windows.net'
 
 # AWS S3 Access
 export AWS_DEFAULT_REGION=ap-southeast-1
 export AWS_STORAGE_BUCKET_NAME='mbox-demo'
-export AWS_SECRET_ACCESS_KEY=+nR32MyjS12rZU+AxH4rAUnU/GVRwZ6beWZNPMqq
-export AWS_ACCESS_KEY_ID=AKIAT7JJVHN4LC6YDKXU
+export AWS_SECRET_ACCESS_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+export AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXXXXX
 
 # FaceNet and USE CMLM Models
 export KERAS_HOME=/home/jose/Workspaces/mbox/frontend/models
